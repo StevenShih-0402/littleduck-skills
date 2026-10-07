@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{頁面標題，2～6 個字的名稱}}</title>
+  <!-- 台北黑體非 Google Fonts 字型：本機已安裝即使用，未安裝則退回 Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Taipei Sans TC Beta"', '"Taipei Sans TC"', '"Noto Sans TC"', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { background: #f8fafc; }
+    .slide { break-inside: avoid; }
+    /* 向下箭頭 */
+    .arrow-down { display: flex; flex-direction: column; align-items: center; color: #94a3b8; }
+    .arrow-down .shaft { width: 2px; height: 22px; background: currentColor; }
+    .arrow-down .head { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 9px solid currentColor; }
+    /* 向右箭頭（窄螢幕自動轉為向下）；反向箭頭在 .head 加 style="transform: rotate(180deg)" 並放在 .shaft 前 */
+    .arrow-right { display: flex; align-items: center; color: #94a3b8; }
+    .arrow-right .shaft { height: 2px; flex: 1; min-width: 24px; background: currentColor; }
+    .arrow-right .head { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 9px solid currentColor; }
+    @media (max-width: 1023px) {
+      .arrow-right { flex-direction: column; min-height: 40px; }
+      .arrow-right .shaft { width: 2px; height: auto; min-height: 22px; min-width: 0; flex: 1; }
+      .arrow-right .head { border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 9px solid currentColor; border-bottom: 0; }
+    }
+    code { font-size: 0.85em; }
+  </style>
+</head>
+<body class="font-sans text-slate-700 antialiased">
+  <main class="mx-auto max-w-6xl px-4 py-10 space-y-12">
+
+    <!-- ===== 元件：封面 ===== -->
+    <header class="slide rounded-3xl border border-slate-200 bg-white px-8 py-10 shadow-sm">
+      <p class="text-sm font-medium tracking-widest text-sky-500">{{專案 ｜ 議題代號 ｜ 主題}}</p>
+      <h1 class="mt-3 text-3xl font-bold text-slate-800 sm:text-4xl">{{主標題}}</h1>
+      <p class="mt-4 max-w-3xl leading-relaxed text-slate-500">{{一兩句摘要}}</p>
+      <!-- 元件：圖例膠囊（顏色意義在封面交代一次） -->
+      <div class="mt-6 flex flex-wrap gap-2 text-xs">
+        <span class="rounded-full bg-sky-50 px-3 py-1 text-sky-600 ring-1 ring-sky-100">{{類別 A}}</span>
+        <span class="rounded-full bg-violet-50 px-3 py-1 text-violet-600 ring-1 ring-violet-100">{{類別 B}}</span>
+      </div>
+    </header>
+
+    <!-- ===== 元件：投影片區塊（每個章節一張） ===== -->
+    <section class="slide rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <h2 class="text-xl font-bold text-slate-800">{{一、章節標題}}</h2>
+      <p class="mt-1 text-sm text-slate-500">{{這張圖要讀者帶走的一句結論}}</p>
+
+      <!-- 元件：橫向流程（方塊 → 方塊） -->
+      <div class="mt-8 flex flex-col items-stretch lg:flex-row lg:items-center">
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-center lg:w-56">
+          <p class="font-semibold text-rose-600">{{節點名稱}}</p>
+          <p class="mt-1 text-xs text-rose-500">{{一行說明}}</p>
+        </div>
+        <div class="arrow-right px-2"><div class="shaft"></div><div class="head"></div></div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center lg:flex-1">
+          <p class="font-semibold text-slate-700">{{節點名稱}}</p>
+        </div>
+      </div>
+
+      <!-- 元件：縱向箭頭 -->
+      <div class="arrow-down my-2"><div class="shaft"></div><div class="head"></div></div>
+
+      <!-- 元件：邊界框（容器 / 系統 / 階段），內含步驟卡格線 -->
+      <div class="rounded-2xl border-2 border-dashed border-sky-200 p-5">
+        <p class="mb-4 text-sm font-semibold text-sky-600">{{邊界名稱}}</p>
+        <div class="grid gap-3 md:grid-cols-3">
+          <!-- 元件：步驟卡（含結果徽章） -->
+          <div class="flex flex-col rounded-xl border border-violet-200 bg-violet-50 p-4">
+            <p class="text-xs font-medium text-violet-400">{{步驟 ①}}</p>
+            <p class="font-semibold text-violet-700">{{步驟名稱}}</p>
+            <p class="mt-1 text-xs leading-relaxed text-violet-600">{{說明}}</p>
+            <div class="mt-auto pt-3"><span class="rounded-md bg-white px-2 py-1 text-xs font-semibold text-rose-500 ring-1 ring-rose-100">{{結果}}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 元件：分層帶（架構分層、依賴由上往下） -->
+      <div class="mt-8 rounded-2xl bg-violet-50/60 p-4 ring-1 ring-violet-100">
+        <p class="mb-3 text-xs font-semibold tracking-widest text-violet-500">{{層級名稱（大寫英文或中文）}}</p>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-xl border border-violet-200 bg-white px-4 py-3">
+            <p class="font-semibold text-violet-700">{{項目}}</p>
+            <p class="text-xs text-slate-500">{{說明}}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 元件：表格投影片 ===== -->
+    <section class="slide rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <h2 class="text-xl font-bold text-slate-800">{{二、表格標題}}</h2>
+      <div class="mt-6 overflow-x-auto rounded-2xl ring-1 ring-slate-200">
+        <table class="w-full min-w-[640px] text-left text-sm">
+          <thead class="bg-slate-50 text-xs text-slate-500">
+            <tr>
+              <th class="px-4 py-3 font-semibold">{{欄位}}</th>
+              <th class="px-4 py-3 font-semibold">{{欄位}}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr>
+              <td class="px-4 py-3 font-mono text-xs text-slate-600">{{代碼類內容用 mono}}</td>
+              <td class="px-4 py-3"><span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-600">{{標籤}}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="pb-6 text-center text-xs text-slate-400">{{來源 ｜ 日期}}</footer>
+  </main>
+</body>
+</html>
