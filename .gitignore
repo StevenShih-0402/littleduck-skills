@@ -1,0 +1,9 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# 本機環境
+.env
+.env.local
