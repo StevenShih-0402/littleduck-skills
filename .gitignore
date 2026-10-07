@@ -7,3 +7,6 @@ Thumbs.db
 # 本機環境
 .env
 .env.local
+
+# Claude Code 本機設定（個人權限/MCP 啟用，不進版控）
+.claude/settings.local.json
