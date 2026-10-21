@@ -16,24 +16,59 @@
 
 ## 安裝 / 更新到其他專案
 
+在要安裝的專案目錄執行一行指令即可，**不需要先 clone 本 repo**：
+
 ```sh
-/path/to/littleduck-skills/install.sh <選項> [目標專案路徑]
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- <選項> [目標專案路徑]
 ```
 
 第一個參數**必填**；未給目標路徑時預設安裝到目前工作目錄（`$PWD`）。例：
 
 ```sh
 # 只裝 draw-mermaid
-/path/to/littleduck-skills/install.sh draw-mermaid
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- draw-mermaid
 
 # 除 agent-team 外全部裝到指定專案
-/path/to/littleduck-skills/install.sh all /path/to/your-project
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- all /path/to/your-project
 
 # 在新的協作中樞 repo 建立 agent-team 骨架
-/path/to/littleduck-skills/install.sh agent-team /path/to/team-hq
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- agent-team /path/to/team-hq
+
+# 列出全部可選項／顯示用法
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- --list
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- --help
 ```
 
-`install.sh --list` 列出全部可選項，`install.sh --help` 顯示用法。缺少選項或選項不存在時，腳本會列出可選項並以非零狀態結束，不會複製任何檔案。
+缺少選項或選項不存在時，腳本會列出可選項並以非零狀態結束，不會複製任何檔案。
+
+腳本會從 GitHub 下載本 repo 的壓縮檔到暫存目錄作為來源，安裝完（或失敗、被中斷）即清除，不會在電腦上留下 clone。需要 `curl` 或 `wget`，以及 `tar`；缺少工具或下載失敗時會說明原因並以非零狀態結束，不寫入目標專案。
+
+### 固定版本
+
+預設安裝 `main` 分支的最新內容。以環境變數 `LITTLEDUCK_REF` 指定分支、tag 或 commit SHA（注意變數要放在 `sh` 前面）：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | LITTLEDUCK_REF=<分支或 tag> sh -s -- all
+```
+
+### 先檢視再執行
+
+不想直接執行網路上的腳本時，可以先下載、看過內容再跑：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh -o littleduck-install.sh
+less littleduck-install.sh
+sh littleduck-install.sh all
+rm littleduck-install.sh
+```
+
+### 從本地 clone 安裝（進階）
+
+已經 clone 本 repo（例如要修改 skill 再安裝）時，直接執行 clone 內的腳本，參數相同，且不會連網：
+
+```sh
+/path/to/littleduck-skills/install.sh <選項> [目標專案路徑]
+```
 
 ### 選項與安裝內容
 
@@ -58,9 +93,9 @@ skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它�
 這也代表本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑。
 安裝後把 `CLAUDE.md` 與 agent 定義裡的 `<frontend-repo>`、`<backend-repo>` 等佔位換成實際路徑，完整說明見 `docs/multi-agent-workflow.md`。
 
-### Tab 補齊（bash）
+### Tab 補齊（bash，僅本地 clone）
 
-在 `~/.bashrc` 加入：
+補齊需要讀取本地 repo 的內容，只適用於從本地 clone 執行 `install.sh`。在 `~/.bashrc` 加入：
 
 ```sh
 source /path/to/littleduck-skills/completions/install.bash
