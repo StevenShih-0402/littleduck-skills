@@ -7,16 +7,27 @@
 #   agent-team    多 Agent 協作中樞（team-hq）骨架；已存在的檔案一律略過
 # 除 agent-team 外，目標專案沒有 CLAUDE.md 時會一併建立通用開發習慣的 CLAUDE.md（已存在則不覆寫）。
 #
-# 用法：
+# 用法（遠端，免 clone）：
+#   curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- <選項> [目標專案路徑]
+#   以環境變數 LITTLEDUCK_REF 指定要下載的分支或 tag（預設 main），例：
+#   curl -fsSL <同上> | LITTLEDUCK_REF=<tag> sh -s -- all
+#
+# 用法（本地 clone）：
 #   ./install.sh <選項> [目標專案路徑]
 #   ./install.sh --list        列出可選項
 #   ./install.sh --help
 #
+# 腳本旁找不到本 repo 的資產時（例：以 curl | sh 執行）即進入遠端模式：
+# 從 GitHub 下載 repo 壓縮檔到暫存目錄作為來源，結束時清除；需要 curl 或 wget，以及 tar。
 # 未給路徑時，預設安裝到目前工作目錄（$PWD）。
 # 可重複執行：重跑即就地更新，不會產生重複或巢狀副本。
-# tab 補齊：在 ~/.bashrc 加入 `source <本 repo>/completions/install.bash`。
+# tab 補齊（僅本地 clone）：在 ~/.bashrc 加入 `source <本 repo>/completions/install.bash`。
 
 set -eu
+
+GITHUB_REPO=StevenShih-0402/littleduck-skills
+REMOTE_REF=${LITTLEDUCK_REF:-main}
+RAW_URL="https://raw.githubusercontent.com/$GITHUB_REPO/main/install.sh"
 
 # --- 解析本腳本（即本 repo）所在目錄，確保複製來源是 repo 本身而非 $PWD ---
 script_path=$0
@@ -29,6 +40,93 @@ while [ -L "$script_path" ]; do
   esac
 done
 REPO_DIR=$(cd "$(dirname "$script_path")" && pwd)
+
+# is_repo <目錄>：同時有 install.deps 與 .claude/skills/ 才視為本 repo（只看其一會把目標專案誤判為來源）
+is_repo() {
+  [ -f "$1/install.deps" ] && [ -d "$1/.claude/skills" ]
+}
+
+if is_repo "$REPO_DIR"; then
+  REMOTE=0
+  INVOKE=$0
+else
+  REMOTE=1
+  INVOKE="curl -fsSL $RAW_URL | sh -s --"
+fi
+
+# --- 下載前就能做的檢查：目標目錄存在（缺選項／--help／--list 需要可選清單，留到取得來源後）---
+case ${1:-} in
+  -h|--help|--list|'') ;;
+  *)
+    if [ ! -d "${2:-$PWD}" ]; then
+      echo "錯誤：目標目錄不存在：${2:-$PWD}" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+# fetch_remote：下載 REMOTE_REF 的 repo 壓縮檔並解壓到暫存目錄，將 REPO_DIR 指向解壓結果
+fetch_remote() {
+  if command -v curl >/dev/null 2>&1; then
+    downloader=curl
+  elif command -v wget >/dev/null 2>&1; then
+    downloader=wget
+  else
+    echo "錯誤：遠端安裝需要 curl 或 wget，兩者皆找不到。" >&2
+    exit 1
+  fi
+  if ! command -v tar >/dev/null 2>&1; then
+    echo "錯誤：遠端安裝需要 tar 解壓下載的檔案。" >&2
+    exit 1
+  fi
+
+  # 先設 trap 再建目錄，避免兩者之間被中斷而留下暫存目錄
+  # 被訊號中斷時 EXIT trap 不會執行，需逐一攔截（PIPE：輸出被 head 等提前關閉；HUP：關閉終端機）
+  TMP_DIR=
+  trap 'cleanup' EXIT
+  trap 'cleanup; exit 129' HUP
+  trap 'cleanup; exit 130' INT
+  trap 'cleanup; exit 141' PIPE
+  trap 'cleanup; exit 143' TERM
+  TMP_DIR=$(mktemp -d)
+
+  url="https://codeload.github.com/$GITHUB_REPO/tar.gz/$REMOTE_REF"
+  echo "下載 github.com/$GITHUB_REPO@$REMOTE_REF ..." >&2
+  # 先存檔再解壓，兩步各自檢查退出碼（POSIX sh 沒有 pipefail，pipe 會吞掉下載失敗）
+  if [ "$downloader" = curl ]; then
+    curl -fsSL "$url" -o "$TMP_DIR/src.tar.gz" || download_failed
+  else
+    wget -q -O "$TMP_DIR/src.tar.gz" "$url" || download_failed
+  fi
+  mkdir "$TMP_DIR/src"
+  tar -xzf "$TMP_DIR/src.tar.gz" -C "$TMP_DIR/src" || download_failed
+
+  # 頂層目錄名隨 ref 而變（ref 中的 / 會被換成 -），不猜名稱，取唯一的子目錄
+  set -- "$TMP_DIR"/src/*/
+  if [ $# -ne 1 ] || ! is_repo "${1%/}"; then
+    download_failed
+  fi
+  REPO_DIR=${1%/}
+}
+
+cleanup() {
+  if [ -n "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+
+download_failed() {
+  echo "錯誤：無法取得 github.com/$GITHUB_REPO@$REMOTE_REF（網路問題，或分支／tag 不存在）。" >&2
+  echo "可改用本地 clone：git clone https://github.com/$GITHUB_REPO.git 後執行 <clone 路徑>/install.sh <選項> [目標專案路徑]" >&2
+  exit 1
+}
+
+if [ "$REMOTE" = 1 ]; then
+  fetch_remote
+  SOURCE_DESC="github.com/$GITHUB_REPO@$REMOTE_REF"
+else
+  SOURCE_DESC=$REPO_DIR
+fi
 DEPS_FILE="$REPO_DIR/install.deps"
 KIT_DIR="$REPO_DIR/agent-team"
 
@@ -42,7 +140,10 @@ list_names() {
 }
 
 usage() {
-  echo "用法：$0 <選項> [目標專案路徑]"
+  echo "用法：$INVOKE <選項> [目標專案路徑]"
+  if [ "$REMOTE" = 1 ]; then
+    echo "      以 LITTLEDUCK_REF=<分支或 tag> 指定下載版本（預設 main）"
+  fi
   echo
   echo "選項（必填，擇一）："
   list_names | sed 's/^/  /'
@@ -78,7 +179,7 @@ case $SELECTION in
     if ! is_skill "$SELECTION"; then
       echo "錯誤：未知的安裝選項：$SELECTION" >&2
       if [ -d "$SELECTION" ]; then
-        echo "（第一個參數現在是安裝選項；要全部安裝到該目錄請用：$0 all $SELECTION）" >&2
+        echo "（第一個參數現在是安裝選項；要全部安裝到該目錄請用：$INVOKE all $SELECTION）" >&2
       fi
       echo >&2
       usage >&2
@@ -87,20 +188,15 @@ case $SELECTION in
     ;;
 esac
 
-# --- 解析目標專案路徑（第二個參數，預設 $PWD）---
-TARGET=${2:-$PWD}
-if [ ! -d "$TARGET" ]; then
-  echo "錯誤：目標目錄不存在：$TARGET" >&2
-  exit 1
-fi
-TARGET=$(cd "$TARGET" && pwd)
+# --- 解析目標專案路徑（第二個參數，預設 $PWD；存在與否已在取得來源前檢查）---
+TARGET=$(cd "${2:-$PWD}" && pwd)
 
 if [ "$TARGET" = "$REPO_DIR" ]; then
   echo "錯誤：目標與來源 repo 相同（$REPO_DIR），無須安裝。" >&2
   exit 1
 fi
 
-echo "來源 repo : $REPO_DIR"
+echo "來源 repo : $SOURCE_DESC"
 echo "安裝目標  : $TARGET"
 echo "安裝選項  : $SELECTION"
 echo
