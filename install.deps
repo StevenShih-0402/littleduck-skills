@@ -1,0 +1,14 @@
+# install.sh 的 skill 相依宣告。一行一個 skill：<skill>: <資產>...
+# 資產格式：skill:<skill 名稱>、commands:<.claude/commands/ 下的相對路徑>、dir:<repo 根目錄下的目錄>
+# 未列出的 skill 視為無相依，只安裝它自己的目錄。相依會遞迴展開並去重。
+
+openspec-apply-change:   commands:opsx/apply.md
+openspec-archive-change: commands:opsx/archive.md
+openspec-explore:        commands:opsx/explore.md
+openspec-propose:        commands:opsx/propose.md
+openspec-sync-specs:     commands:opsx/sync.md
+
+# 三段式 Linear → OpenSpec 流程視為一組：裝任一段都帶齊三段、openspec 系列與 linear/ 模板
+issue-reader:    skill:issue-processor skill:issue-solver skill:openspec-propose skill:openspec-apply-change skill:openspec-archive-change skill:openspec-sync-specs skill:openspec-explore dir:linear
+issue-processor: skill:issue-reader
+issue-solver:    skill:issue-reader
