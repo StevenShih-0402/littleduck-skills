@@ -33,5 +33,7 @@
 
 - 所有交接都落在 `openspec/changes/<change-id>/`，Agent 之間不共享對話
 - 每個 Agent 開工先讀、結束時在 `handoff.md` 追加紀錄（範本：`openspec/handoff-template.md`）
+- `handoff.md` 開頭的「## 狀態」區塊就地改值，是流程進度的唯一依據；中斷後重新派工時，開發 Agent 依它接續
+- 後端 repo 需安裝 `/backend-processor`（`install.sh backend-processor <backend-repo>`），否則 Chika 叫不到
 - 只有兩個人工檢查點：提案核准、歸檔前確認
 - 同一階段退回上限 2 次，超過交給使用者
