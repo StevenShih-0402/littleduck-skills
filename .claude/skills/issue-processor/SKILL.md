@@ -1,6 +1,6 @@
 ---
 name: issue-processor
-description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISSUE-ID>-<code> 分支 → /opsx:apply → 依 change_template 把任務清單與解決過程回填 Linear。Use when the user invokes /issue-processor with an OpenSpec change name.
+description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISSUE-ID>-<code> 分支 → /opsx:apply → 專案有 openspec/spec-sync.yaml 時檢查規格有無漏寫 → 依 change_template 把任務清單與解決過程回填 Linear。Use when the user invokes /issue-processor with an OpenSpec change name.
 ---
 
 # Skill: Issue Processor
@@ -9,7 +9,7 @@ description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISS
 
 | 階段 | Skill | 呼叫方式 |
 |------|-------|----------|
-| 1. 讀 issue → 提案 | `issue-reader` | `/issue-reader SDP-99` |
+| 1. 讀 issue → 提案 | `issue-reader` | `/issue-reader ENG-99` |
 | **2. 實作**（本 skill） | `issue-processor` | `/issue-processor <提案名稱>` |
 | 3. 歸檔 + PR | `issue-solver` | `/issue-solver <提案名稱>` |
 
@@ -17,7 +17,8 @@ description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISS
 
 **本 skill 不 commit、不 push、不歸檔**——那是 `issue-solver` 的事。實作完成後工作區會留著未 commit 的變更，這是預期狀態。
 
-**parent / sub-issue 結構**：交接檔的 `issues` 是**主 issue**（最上層），只回頭補 `> 更動摘要` 引言區塊；`# 實作完成` 則**寫在每一張 `sub_issues`**。本階段沒有狀態變化，
+**parent / sub-issue 結構**：交接檔的 `issues` 是**主 issue**（最上層），只回頭補 `> 更動摘要` /
+`> ▲ 前端需注意的變動` 兩個引言區塊；`# 實作完成` 則**寫在每一張 `sub_issues`**。本階段沒有狀態變化，
 兩層都維持 In Progress。
 
 ---
@@ -34,7 +35,7 @@ description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISS
 
 2. 讀取 `linear/change_template.md`（**每次都要實際讀檔，不要憑記憶套格式**），步驟 5 回填要用。
 
-3. 確認在專案根目錄（`.mcp.json`、`openspec/`、`pyproject.toml` 所在；greenfield 階段 `pyproject.toml` 可能由本 change 建立）。
+3. 確認在專案根目錄（`.mcp.json`、`openspec/` 所在），並讀專案 `CLAUDE.md`（步驟 4 的測試與 lint 指令從這裡取）。
 
 ---
 
@@ -67,7 +68,7 @@ description: 依 OpenSpec 提案完成實作：讀交接檔 → 建 <label>/<ISS
 **先建分支再改任何檔案**：
 
 ```bash
-git switch -c <branch>          # 交接檔的 branch，例：feature/SDP-99-version-api
+git switch -c <branch>          # 交接檔的 branch，例：feature/ENG-99-version-api
 ```
 
 - 分支名**必須含 Linear issue ID**（`<label>/<ISSUE-ID>-<code>`）。交接檔的 `branch` 若不合此格式
@@ -80,24 +81,42 @@ git switch -c <branch>          # 交接檔的 branch，例：feature/SDP-99-ver
 
 執行 `/opsx:apply <change 名稱>`，照該 change 的 `tasks.md` 逐項完成、逐項打勾。
 
-本專案是**單人本機自用的 Python CLI 工具**（`ollama_tools`）：`src/` 佈局、以 `pyproject.toml`
-管相依、CLI 走標準庫 `argparse`，**無 CI、無 docker、無 pants、無 monorepo 子專案**。
-實作期間遵守 `openspec/changes/<change>/design.md` 的技術決策，幾個最容易踩的：
+實作期間的技術棧規範（測試、lint、建置、相依管理、執行環境）**一律以專案 `CLAUDE.md` 與
+`openspec/changes/<change>/design.md` 為準**，本 skill 不另訂。以下是跨專案都成立的條目：
 
 | 項目 | 規範 |
 |------|------|
-| 相依管理 | runtime 相依一律加進 `pyproject.toml`（例：`ollama` 套件）；**維持 design 的最小相依原則**——CLI 用 `argparse`（標準庫）、讀 Git 用 `subprocess` 呼 `git log`（**不引 GitPython**），別順手多裝套件。裝相依用 `uv`（`uv add`／`uv sync`） |
-| 測試 | 在專案虛擬環境內跑 `pytest`（`uv run pytest`），**不需 docker、不需 pants**。測試要能在**沒有本地 Ollama 服務、沒有 `LINEAR_API_KEY`** 的情況下通過——外部來源（Ollama／Git／Linear）一律 **mock 或以 fixture 注入**，不要在測試裡真的打 `localhost:11434` 或 Linear API |
-| 外部服務未就緒 | 本地 Ollama 未啟動、無 Linear token 時，**提示 user 自行處理，不要代為啟動服務或處理憑證**；受此阻擋而無法實機驗證的部分，照 env-blocked 流程註記 |
-| lint / format | 跑 `uv run ruff format` + `uv run ruff check`（本專案的 lint 工具）。**只動本次 change 碰到的檔案**，不要對整個 repo 做越界 autofix；`ruff check --fix` 僅在確認範圍限於本次改動時才用 |
+| 測試 | 依專案 `CLAUDE.md`／`design.md` 寫明的指令與環境執行，**只跑變更範圍**。兩份都沒寫怎麼跑時，以 **AskUserQuestion** 問 user，**不要自行猜指令** |
+| lint / format | 依專案文件的工具，**只對本次 change 碰到的檔案**執行；不要跑會對整個 repo 越界 autofix 的指令 |
+| 外部服務未就緒 | 資料庫、容器、第三方服務未啟動或缺憑證時，**提示 user 自行處理，不要代為啟動服務或處理憑證**；受此阻擋的部分照下方 env-blocked 註記 |
+| 相依 | 只加 `design.md` 決定要用的套件，別順手多裝 |
 | 註解 | 一律**繁體中文** |
-| 版本 | 版本號**以 `pyproject.toml` 的 `version` 為單一來源**。change 若含版本 bump，改 `pyproject.toml` 即可；`README.md` / `CHANGELOG.md` **存在時**才同步補一列，**不存在就不要為此新建檔案**（greenfield 階段多半還沒有） |
+| 版本 | change 含版本 bump 時，依專案 `CLAUDE.md` 的同步規則，所有出現版號的地方一起改；`CHANGELOG.md` 等檔案**存在時**才補，不存在不要為此新建 |
 
-> greenfield 注意：某項工具（ruff 設定、測試骨架、`pyproject.toml` 的 dev 相依）**若本 change 之前還沒建立**，
-> 就依 `tasks.md` 把它一併建起來（這本來就是提案的一部分），不要因為「專案還沒有」就跳過 lint／測試。
+> greenfield 注意：某項工具（lint 設定、測試骨架）**若本 change 之前還沒建立**，
+> 就依 `tasks.md` 把它一併建起來，不要因為「專案還沒有」就跳過 lint／測試。
 
-若 `tasks.md` 有項目因環境限制做不到（本地 Ollama 未起、無 Linear token、無法實機驗證等），
+### 破壞性變更：一律新舊版並存
+
+實作前先依專案 `CLAUDE.md`「API 相容性」的判準，判定本次是否為**破壞性變更**——會讓 API 使用方原本能成功的請求變成失敗或報錯即是：路由改名或改 method、回應欄位改名／移除／改型別、請求契約收緊、權限收緊。
+
+- 是破壞性變更時，**不就地修改既有端點**：保留舊端點，另開**跳版本號**的新端點（`api/v1/…` 保留 → 新增 `api/v2/…`）；舊版的移除必須是另一個獨立的 change。
+- 新增選填請求欄位、新增回應欄位、放寬驗證、不影響契約的內部修正**不算**，可直接就地改。
+- `tasks.md` 的條目讀起來要就地改既有端點、但依判準屬破壞性變更時，**停下來回報並建議更新 artifact**（改成新增新版端點），不要照字面實作。
+
+若 `tasks.md` 有項目因環境限制做不到（服務未啟動、缺憑證、無法實機驗證等），
 **在 `tasks.md` 就地註記原因（env-blocked）**，不要默默打勾，也不要因此停掉其餘任務。
+
+### 實作完成後：規格同步閘門
+
+專案有 `openspec/spec-sync.yaml` 時，`/opsx:apply` 完成後依 **`spec-sync/README.md`** 的判定檢查本次是否漏寫規格（規則格式與判定只讀該檔，本 skill 不另抄）；沒有設定檔就略過。
+
+- `capability` 目標看本 change 有沒有對應的 delta（`openspec/changes/<change>/specs/<capability>/spec.md`），**不要直接改 `openspec/specs/` 的主規格**——主規格由 `issue-solver` 歸檔時的 sync 寫入。
+- `spec_dir` 目標看文件本身有沒有更新。
+- 有不通過的目標時，以 **AskUserQuestion** 列出目標與觸發路徑，讓 user 選：
+  - 「現在補上」：寫 delta（依 OpenSpec delta 格式，ADDED／MODIFIED 等）或更新文件，視為本次實作的一部分，補完重跑檢查；
+  - 「留給 issue-solver 決定」：不補，在報告列為待決，由收尾時的最終閘門決定補或宣告免同步。
+- **免同步不在本階段宣告**。
 
 ## 步驟 5：回填實作結果
 
@@ -115,7 +134,8 @@ git switch -c <branch>          # 交接檔的 branch，例：feature/SDP-99-ver
   與原因），清單底下簡短說明更動的範圍與重點。日期用絕對日期。跨多張 sub-issue 的任務寫在最相關那張，
   其餘以代號交叉引用，不要整段複製。
 - `> 更動摘要`（主 issue）：人類易讀的重點描述，涵蓋**全部 sub-issue** 的成果。
-  sub-issue；確實沒有就寫「無」。
+- `> ▲ 前端需注意的變動`（主 issue）：API 路徑、欄位名、序列化欄位、權限等會影響 API 使用方的變動，一樣彙整全部
+  sub-issue；確實沒有就寫「無」。新增新版端點時要列出新路徑與改動的欄位。
 
 **狀態維持 In Progress**（主 issue 與 sub-issue 皆是）——轉狀態是 `issue-solver` 開 PR 之後的事。
 
@@ -133,6 +153,7 @@ git switch -c <branch>          # 交接檔的 branch，例：feature/SDP-99-ver
 - 分支名（已建立／已切換）
 - `tasks.md` 完成度（幾項完成、哪幾項未完成及原因）
 - 測試與 lint 的實際結果（**跑了什麼、結果如何；跳過就說跳過**，不要粉飾）
+- 規格同步閘門結果：不適用／通過／現在補上了哪些／留給 issue-solver 的待決目標
 - 已回填的 Linear issue
 - **下一步指令**：`/issue-solver <change 名稱>`
 
@@ -142,6 +163,7 @@ git switch -c <branch>          # 交接檔的 branch，例：feature/SDP-99-ver
 
 - **本 skill 到實作 + 回填為止**：不要 `git commit`、不要 `git push`、不要 `/opsx:archive`、不要開 PR。
 - **先建分支再改檔案**，絕不在 `main` 上直接實作。
+- **破壞性變更不就地改既有端點**：`tasks.md` 要求就地改、但屬破壞性變更時停下回報，建議改成新增新版端點。
 - 遇到「tasks 語意不清」「實作揭露設計問題」→ **停下來回報並建議更新 artifact**，不要靠猜測往下做。
 - 對 Linear 的寫入是對外可見的動作：只改 description，**不要順手改 assignee、priority、project、label**。
 - **不要把 `# 實作完成` 寫進帶 sub-issue 的主 issue**，也**不要把引言區塊寫進 sub-issue**；

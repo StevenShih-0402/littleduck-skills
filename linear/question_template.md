@@ -11,4 +11,4 @@ Issue description (包含內容或圖片)
 
 # 新增回傳版本號的 API
 code: version-api
-在 libs/common/ignsw_common/app_templates/rbac/views/auth_view.py 新增一個「回傳後端專案版本號」的 API，序列化欄位使用 "backend_ver": "0.x.x" 這樣的格式，確保 IOA 和 LaB 的 Swagger 都有顯
+在後端新增一個「回傳後端專案版本號」的 API，序列化欄位使用 "backend_ver": "0.x.x" 這樣的格式，並確保 API 文件（例：Swagger）有顯示且可以呼叫。

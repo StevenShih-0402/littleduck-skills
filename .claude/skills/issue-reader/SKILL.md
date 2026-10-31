@@ -9,16 +9,16 @@ description: 從 Linear issue 代號產生 OpenSpec 提案：讀 issue → 檢�
 
 | 階段 | Skill | 呼叫方式 |
 |------|-------|----------|
-| **1. 讀 issue → 提案**（本 skill） | `issue-reader` | `/issue-reader SDP-99` |
+| **1. 讀 issue → 提案**（本 skill） | `issue-reader` | `/issue-reader ENG-99` |
 | 2. 實作 | `issue-processor` | `/issue-processor <提案名稱>` |
 | 3. 歸檔 + PR | `issue-solver` | `/issue-solver <提案名稱>` |
 
-**呼叫方式**：`/issue-reader SDP-99` 或 `/issue-reader SDP-99, SDP-102`（逗號或空白分隔皆可）。
+**呼叫方式**：`/issue-reader ENG-99` 或 `/issue-reader ENG-99, ENG-102`（逗號或空白分隔皆可）。
 
-**多張 issue 一律合併成單一提案**（同 SDP-11 + SDP-12 的做法）：一份 change、一條分支、一批 commit，最後回填到每一張 issue。
+**多張 issue 一律合併成單一提案**（同 ENG-11 + ENG-12 的做法）：一份 change、一條分支、一批 commit，最後回填到每一張 issue。
 
 **parent / sub-issue 結構**：若 issue 底下掛著多個 sub-issue，**模板內容依區塊分層回填**——
-最上層 issue 只留 `> 更動摘要` 引言區塊，`# 調查結果` / `# 實作決策`
+最上層 issue 只留 `> 更動摘要` 與 `> ▲ 前端需注意的變動` 兩個引言區塊，`# 調查結果` / `# 實作決策`
 則**寫在各自對應的 sub-issue**。`code:` 仍只補最上層那張，comment 也只寫最上層；sub-issue 的狀態
 要跟著最上層一起流轉。詳見步驟 2-1 與步驟 5。
 
@@ -50,9 +50,9 @@ description: 從 Linear issue 代號產生 OpenSpec 提案：讀 issue → 檢�
 
 ## 步驟 1：解析參數
 
-- 從參數取出所有 issue identifier（`SDP-\d+`）。**沒有任何 identifier 就中止**並說明呼叫方式，
+- 從參數取出所有 issue identifier（Linear identifier：`[A-Z][A-Z0-9]*-\d+`，例：`ENG-123`；不限定 team 前綴）。**沒有任何 identifier 就中止**並說明呼叫方式，
   不要猜測要處理哪張 issue。
-- 宣告：「本次處理：SDP-xx、SDP-yy（合併為單一提案）」。（層級判定在步驟 2-1，宣告可能因此修正。）
+- 宣告：「本次處理：ENG-xx、ENG-yy（合併為單一提案）」。（層級判定在步驟 2-1，宣告可能因此修正。）
 
 ## 步驟 2：讀取 issue、判定主 issue、檢查格式
 
@@ -61,12 +61,12 @@ description: 從 Linear issue 代號產生 OpenSpec 提案：讀 issue → 檢�
 ### 2-1 判定主 issue（parent / sub-issue）
 
 Linear issue 可能是「一張最上層 issue 底下掛多個 sub-issue」的結構。此時**回填分兩層**：最上層放
-`> 更動摘要` （跨 sub-issue 的總覽），各 sub-issue 放自己的 `# 調查結果` /
+`> 更動摘要` / `> ▲ 前端需注意的變動`（跨 sub-issue 的總覽），各 sub-issue 放自己的 `# 調查結果` /
 `# 實作決策`。`code:` 只補最上層那張，comment 也只寫最上層，狀態則兩層都轉。
 
 | 情況 | 處置 |
 |------|------|
-| 傳入的 issue **有 parent** | **停下來用 AskUserQuestion 問 user**：改以 parent（`SDP-xx`）為主 issue，還是就地處理這張 sub-issue。**不要自行決定**——這決定了分支名與 Linear automation 會動到哪張 issue。user 選 parent 就把主 issue 換成 parent，並對它重跑本小節（parent 之上還有 parent 時同樣處理） |
+| 傳入的 issue **有 parent** | **停下來用 AskUserQuestion 問 user**：改以 parent（`ENG-xx`）為主 issue，還是就地處理這張 sub-issue。**不要自行決定**——這決定了分支名與 Linear automation 會動到哪張 issue。user 選 parent 就把主 issue 換成 parent，並對它重跑本小節（parent 之上還有 parent 時同樣處理） |
 | 傳入的 issue **有 sub-issue** | 它就是主 issue。用 `mcp__linear__list_issues`（以 parent 過濾）或 `get_issue` 回傳的子項清單，取得**所有 sub-issue 的標題與 description** 作為步驟 3 的需求輸入。sub-issue 底下還有下一層就整棵讀進來，並把**最底層那批**當成分析回填的落點 |
 | 兩者皆無 | 一般 issue，整份 `analyze_template.md`（引言區塊 + 調查結果 + 實作決策）都寫在這張 |
 
@@ -89,7 +89,7 @@ Linear issue 可能是「一張最上層 issue 底下掛多個 sub-issue」的�
 
 1. 用 `mcp__linear__save_issue` 把 `code: <推導值>` **插在標題敘述之後、原 description 之前**，
    保留原內容不動。
-2. 在對話中明確告知：「SDP-xx 缺 `code:`，已依標題補為 `<值>` 並寫回 Linear」——**必須讓 user 看到**，
+2. 在對話中明確告知：「ENG-xx 缺 `code:`，已依標題補為 `<值>` 並寫回 Linear」——**必須讓 user 看到**，
    因為這個值決定分支名。
 
 **分支代號 `code` 的決定**（本 skill 只決定、不建分支）：
@@ -98,12 +98,12 @@ Linear issue 可能是「一張最上層 issue 底下掛多個 sub-issue」的�
 - 多張 issue → 用 **AskUserQuestion** 讓 user 從各 issue 的 `code` 中挑一個，或提供一個新的合併代號。
   **不要自行挑選**，分支名是 user 之後要一直看到的東西。
 
-**分支命名規範**：`<prefix>/<ISSUE-ID>-<code>`，例：`feature/SDP-99-version-api`、`bug/SDP-12-auth-bug`。
+**分支命名規範**：`<prefix>/<ISSUE-ID>-<code>`，例：`feature/ENG-99-version-api`、`bug/ENG-12-auth-bug`。
 
 | 欄位 | 來源 |
 |------|------|
 | `prefix` | 該 issue 的 Linear label **原字轉小寫**，不做語意映射（`Feature` → `feature`、`Bug` → `bug`、`Improvement` → `improvement`）。多張 issue 或多個 label 時取**第一張 issue 的第一個 label**；完全沒有 label 時用 `feature`，並在報告中說明 |
-| `ISSUE-ID` | Linear issue 代號**原字大寫**（`SDP-99`）。多張 issue 時用**第一張**（主 issue），其餘 issue 靠 PR 內文的 magic word 關聯 |
+| `ISSUE-ID` | Linear issue 代號**原字大寫**（`ENG-99`）。多張 issue 時用**第一張**（主 issue），其餘 issue 靠 PR 內文的 magic word 關聯 |
 | `code` | 上面決定的 kebab-case 短代號 |
 
 > **issue ID 必須在分支名裡**：Linear 的 GitHub automation 靠分支名認 issue，PR 開啟時才會自動把狀態
@@ -130,19 +130,19 @@ propose 會產出 `proposal.md` / `design.md` / `specs/**` / `tasks.md`。**先�
 
 ```markdown
 <!-- issue-reader 產生的交接檔；issue-processor / issue-solver 讀取。請勿手動修改 issues / branch。 -->
-issues: SDP-99, SDP-102
-primary_issue: SDP-99
-sub_issues: SDP-100, SDP-101
+issues: ENG-99, ENG-102
+primary_issue: ENG-99
+sub_issues: ENG-100, ENG-101
 code: version-api
 label: feature
-branch: feature/SDP-99-version-api
+branch: feature/ENG-99-version-api
 change: ocr-size-limit-and-version-api
 stage: proposed
 ```
 
 | 欄位 | 意義 |
 |------|------|
-| `issues` | **主 issue**（最上層），`code:` / 引言區塊（更動摘要）/ comment / PR magic word 都認這些 |
+| `issues` | **主 issue**（最上層），`code:` / 引言區塊（更動摘要、前端需注意的變動）/ comment / PR magic word 都認這些 |
 | `sub_issues` | `issues` 底下的 sub-issue，**各自回填調查結果 / 實作決策 / 實作完成**，狀態一併同步；沒有就寫 `-` |
 
 `stage` 由後續 skill 依序改為 `applied`（issue-processor 完成）、`archived`（issue-solver 完成）。
@@ -158,7 +158,7 @@ stage: proposed
 
 | 落點 | 寫哪些區塊 |
 |------|-----------|
-| **主 issue**（交接檔 `issues`） | **只有** `> 更動摘要` 引言區塊，**此時先留佔位**（`change_template.md` 要求實作完成後才回頭填，那是 `issue-processor` 的事）。**不寫** `# 調查結果` / `# 實作決策` |
+| **主 issue**（交接檔 `issues`） | **只有** `> 更動摘要`、`> ▲ 前端需注意的變動` 兩個引言區塊，**此時先留佔位**（`change_template.md` 要求實作完成後才回頭填，那是 `issue-processor` 的事）。**不寫** `# 調查結果` / `# 實作決策` |
 | **每一張 sub-issue** | `# 調查結果（日期）` + `# 實作決策`，內容**只限該 sub-issue 的範圍**。不寫引言區塊 |
 
 沒有 sub-issue 的一般 issue：四個區塊全寫在該張（引言一樣留佔位）。
@@ -167,7 +167,7 @@ stage: proposed
   日期用絕對日期（`2026-07-31`）。
 - `# 實作決策`：將進行什麼修改；**特別註明與 issue 原文的差異**（例：檔案落點改了、取值位置改了），
   這是回填最有價值的部分。
-- 一段分析橫跨多張 sub-issue 時，寫在**最相關**的那張，其餘張以代號交叉引用（`詳見 SDP-101`），
+- 一段分析橫跨多張 sub-issue 時，寫在**最相關**的那張，其餘張以代號交叉引用（`詳見 ENG-101`），
   不要整段複製到每一張。
 - 調查後判定某張 sub-issue **不需要改動**（問題不存在、已修過）時，該張照樣要寫，把結論寫清楚。
 
