@@ -2,8 +2,8 @@
 # littleduck-skills 安裝/更新腳本
 #
 # 依選項把本 repo 的可散佈資產同步進目標專案：
-#   <skill 名稱>  該 skill 與它在 install.deps 宣告的相依（其他 skill、指令、linear/ 模板）
-#   all           除 agent-team 以外的全部 skills、commands、linear/ 模板
+#   <skill 名稱>  該 skill 與它在 install.deps 宣告的相依（其他 skill、指令、linear/ 模板、spec-sync/ 說明）
+#   all           除 agent-team 以外的全部 skills、commands、linear/ 模板、spec-sync/ 說明
 #   agent-team    多 Agent 協作中樞（team-hq）骨架；已存在的檔案一律略過
 # 除 agent-team 外，目標專案沒有 CLAUDE.md 時會一併建立通用開發習慣的 CLAUDE.md（已存在則不覆寫）。
 #
@@ -310,9 +310,11 @@ case $SELECTION in
     echo "  已同步 .claude/commands/"
     copy_contents "$REPO_DIR/linear"           "$TARGET/linear"
     echo "  已同步 linear/"
+    copy_contents "$REPO_DIR/spec-sync"        "$TARGET/spec-sync"
+    echo "  已同步 spec-sync/"
     install_claude_md
     echo
-    echo "完成：全部 skills、commands、linear 模板已安裝/更新到 $TARGET"
+    echo "完成：全部 skills、commands、linear 模板、spec-sync 說明已安裝/更新到 $TARGET"
     ;;
   *)
     install_selected "$SELECTION"

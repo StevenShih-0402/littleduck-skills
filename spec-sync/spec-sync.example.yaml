@@ -1,0 +1,50 @@
+# spec-sync.example.yaml
+# 規格同步閘門的設定範例；複製到專案的 openspec/spec-sync.yaml 再依專案結構修改。格式說明見 spec-sync/README.md。
+
+rules:
+  # capability 目標：OpenSpec 格式的規格，change 內有該 capability 的 delta 即通過，歸檔時由 sync 寫入主規格
+  - name: 應用模組規格
+    paths:
+      - "src/apps/{app}/**"
+    exclude:
+      - "**/__init__.py"
+      - "**/migrations/**"
+    capability: "apps/{app}"
+    exempt_when: 註解、型別標註、私有命名、不改對外行為的內部重構
+
+  # spec_dir 目標（單一擷取）：自由格式的部署文件，檢查文件本身有沒有更新
+  - name: 部署規格
+    paths:
+      - "projects/{proj}/compose/**"
+      - "projects/{proj}/docker-compose-*.yml"
+      - "projects/{proj}/.dockerignore"
+    spec_dir: "projects/{proj}/docs/specs/compose_{proj}/"
+    spec_files: ["spec.md", "diagrams.md"]
+    exempt_when: 只改註解或錯誤訊息文案、不改行為的腳本內部重構
+
+  # 同一組路徑對應多個目標：根目錄的共用部署腳本，兩個子專案的部署文件都要更新，拆成兩條規則
+  - name: 根目錄部署腳本（api 專案）
+    paths:
+      - "deploy.sh"
+      - "backup.sh"
+    spec_dir: "projects/api/docs/specs/compose_api/"
+    spec_files: ["spec.md", "diagrams.md"]
+    exempt_when: 只改了另一個子專案專屬的分支
+
+  - name: 根目錄部署腳本（web 專案）
+    paths:
+      - "deploy.sh"
+      - "backup.sh"
+    spec_dir: "projects/web/docs/specs/compose_web/"
+    spec_files: ["spec.md", "diagrams.md"]
+    exempt_when: 只改了另一個子專案專屬的分支
+
+  # 兩層擷取：資料庫 migration → 該專案的資料庫文件
+  - name: 資料庫規格
+    paths:
+      - "projects/{proj}/src/apps/{app}/migrations/*.py"
+    exclude:
+      - "**/__init__.py"
+    spec_dir: "projects/{proj}/docs/specs/database_{proj}/"
+    spec_files: ["spec.md", "diagrams.md"]
+    exempt_when: 不產生 DDL 的選項變更（choices、verbose_name、help_text）、只有資料遷移、不改 schema 的 merge migration
