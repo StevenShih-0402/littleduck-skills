@@ -121,14 +121,16 @@ openspec/changes/ENG-123-order-export/
 - [ ] 建立 team-hq repo，放入四個 agent 定義檔與 /ship-issue
 - [ ] 在 team-hq 的 CLAUDE.md 寫明前後端 repo 路徑與 worktree 慣例
 - [ ] 設定 additional directories，確認從 team-hq 能讀寫兩個 repo 與 wt/
-- [ ] 把 /frontend-processor、/backend-processor 放進各自 repo 的 `.claude/skills/`
+- [ ] 在後端 repo 安裝 /backend-processor（含編輯後 lint hook 與規格同步說明 `spec-sync/`）：
+      `curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- backend-processor <backend-repo>`
+- [ ] /frontend-processor 目前不隨 littleduck-skills 提供，依同一結構自行放進前端 repo 的 `.claude/skills/`
 
 * [ ] 決定 worktree 慣例：例如 `../wt/<repo>-<change-id>`，每個 issue 一組前後端 worktree
 * [ ] 前後端 repo 各自執行 OpenSpec 初始化，確認 /opsx:propose、/opsx:apply、/opsx:archive 可用
 * [ ] 每個 repo 寫好 `CLAUDE.md`：技術棧、目錄結構、啟動 / 測試 / lint 指令、命名慣例
 * [ ] 確認 Linear MCP 已連線，能讀 issue、能改狀態與留言
 * [ ] 確認 `gh` CLI 已登入，能開 PR
-* [ ] 建立 `handoff.md` 範本，放進 OpenSpec 的變更樣板
+* [ ] 建立 `handoff.md` 範本，放進 OpenSpec 的變更樣板（範本已隨安裝放在 `openspec/handoff-template.md`；開頭的「## 狀態」區塊就地改值，開發 Agent 中斷後靠它接續。已用舊版骨架建立的 team-hq，安裝不會覆寫既有檔案，要取新版範本須先移除或改名舊的 `openspec/handoff-template.md` 再重跑 `install.sh agent-team`）
 
 完成標準：在任一 repo 手動開一個 worktree，能跑起服務與測試。
 
@@ -149,7 +151,7 @@ openspec/changes/ENG-123-order-export/
 - [ ] backend skill 寫明完成定義：API 通過單元測試、migration 可正反向執行、openapi.yaml 已定稿
 - [ ] frontend skill 寫明：先用 openapi.yaml 產生型別或 mock，後端未完成也能先切版
 - [ ] 先依序跑（先 BE 後 FE），穩定後再試平行
-- [ ] 加上 hook：編輯檔案後自動跑 lint / 型別檢查
+- [ ] 加上 hook：編輯檔案後自動跑 lint / 型別檢查。後端用 /backend-processor 附帶的 `hooks/post-edit-lint.sh`：`chika.md` 範本的 frontmatter 已註冊（把 `<backend-repo>` 換成實際路徑）；不想綁在 Agent 上時，改在後端 repo 的 `.claude/settings.json` 加同樣的 PostToolUse hook（matcher `Write|Edit`）。lint 指令可用環境變數 `LITTLEDUCK_LINT_CMD` 指定，未指定時自動偵測 `./pants` 或 ruff，都沒有就不跑
 
 完成標準：一個前後端都有改動的 issue，兩個 Agent 各自完成 tasks，且 handoff.md 紀錄完整。
 
@@ -214,12 +216,13 @@ model: sonnet
 開工：讀 proposal.md、design.md、openapi.yaml、tasks.md 中標註 [BE] 的任務。
 缺少任何一份就停下回報，不要開始寫程式。
 
-執行 /backend-processor skill，再以 /opsx:apply 逐項完成任務。
+執行 /backend-processor skill，依它的步驟完成 [BE] 任務；進度以 handoff.md 的「## 狀態」區塊為準。
 
 完成定義：
 - 新增或修改的 API 都有單元測試且全部通過
 - migration 可正向與反向執行
 - openapi.yaml 與實作一致；有改欄位就在 handoff.md 註明
+- 狀態區塊階段為 integrating，worktree 乾淨且已推送
 
 邊界：只在後端 worktree 內工作，不改 proposal.md。
 ```

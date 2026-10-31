@@ -9,8 +9,10 @@
   - `openspec-*` — OpenSpec 提案／實作／歸檔／同步
   - `gen-html` — 用單檔 HTML 產生架構圖、流程圖、比較表等
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
+  - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
 - `.claude/commands/` — `opsx` 等 slash 指令
 - `linear/` — Linear 回填模板（question / analyze / change）
+- `spec-sync/` — 規格同步閘門的設定檔格式與範例（專案放 `openspec/spec-sync.yaml` 才啟用）
 - `CLAUDE.md` — 跨專案通用的開發習慣
 - `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架（只在選 `agent-team` 時安裝）
 
@@ -75,10 +77,11 @@ rm littleduck-install.sh
 | 選項 | 安裝內容 |
 |------|----------|
 | `<skill 名稱>` | 該 skill，加上它在 `install.deps` 宣告的相依（見下） |
-| `issue-reader` / `issue-processor` / `issue-solver` | 三段式 skill 一起裝，加上全部 `openspec-*` skill、`.claude/commands/opsx/`、`linear/` 模板 |
+| `issue-reader` / `issue-processor` / `issue-solver` | 三段式 skill 一起裝，加上全部 `openspec-*` skill、`.claude/commands/opsx/`、`linear/` 模板、`spec-sync/` |
 | `openspec-<名稱>` | 該 skill 與對應的 `.claude/commands/opsx/*.md` 指令 |
 | `gen-html`、`draw-mermaid` | 只有該 skill 本身 |
-| `all` | 除 agent-team 外的全部 `.claude/skills/`、`.claude/commands/`、`linear/` |
+| `backend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；裝在後端 repo，供 agent-team 的後端 Agent 使用 |
+| `all` | 除 agent-team 外的全部 `.claude/skills/`、`.claude/commands/`、`linear/`、`spec-sync/` |
 | `agent-team` | `CLAUDE.md`（team-hq 版）、`.claude/agents/` 四個角色、`.claude/commands/ship-issue.md`、`docs/multi-agent-workflow.md`、`openspec/handoff-template.md` |
 
 skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它會呼叫其他 skill、指令或模板，記得在這裡補上。
@@ -91,6 +94,7 @@ skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它�
 
 骨架是「不存在才建立」：已存在的檔案（例如你改過的 agent 定義）一律略過，不覆寫。
 這也代表本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑。
+例如 `openspec/handoff-template.md` 新增了「## 狀態」區塊，`backend-processor` 依賴它，舊骨架要先移除該檔再重跑才拿得到。
 安裝後把 `CLAUDE.md` 與 agent 定義裡的 `<frontend-repo>`、`<backend-repo>` 等佔位換成實際路徑，完整說明見 `docs/multi-agent-workflow.md`。
 
 ### Tab 補齊（bash，僅本地 clone）

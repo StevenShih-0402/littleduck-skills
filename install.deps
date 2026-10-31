@@ -9,6 +9,9 @@ openspec-propose:        commands:opsx/propose.md
 openspec-sync-specs:     commands:opsx/sync.md
 
 # 三段式 Linear → OpenSpec 流程視為一組：裝任一段都帶齊三段、openspec 系列與 linear/ 模板
-issue-reader:    skill:issue-processor skill:issue-solver skill:openspec-propose skill:openspec-apply-change skill:openspec-archive-change skill:openspec-sync-specs skill:openspec-explore dir:linear
+issue-reader:    skill:issue-processor skill:issue-solver skill:openspec-propose skill:openspec-apply-change skill:openspec-archive-change skill:openspec-sync-specs skill:openspec-explore dir:linear dir:spec-sync
 issue-processor: skill:issue-reader
 issue-solver:    skill:issue-reader
+
+# 後端實作棒：規格同步閘門的格式說明
+backend-processor: dir:spec-sync
