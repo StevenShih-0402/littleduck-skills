@@ -12,3 +12,6 @@ openspec-sync-specs:     commands:opsx/sync.md
 issue-reader:    skill:issue-processor skill:issue-solver skill:openspec-propose skill:openspec-apply-change skill:openspec-archive-change skill:openspec-sync-specs skill:openspec-explore dir:linear dir:spec-sync
 issue-processor: skill:issue-reader
 issue-solver:    skill:issue-reader
+
+# 後端實作棒：規格同步閘門的格式說明
+backend-processor: dir:spec-sync
