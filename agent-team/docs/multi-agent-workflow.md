@@ -14,7 +14,7 @@
 
 | 流程圖階段 | 對應 Agent | 主要 skill / 指令 | 產出 |
 | --- | --- | --- | --- |
-| /issue-architect | architect | /issue-architect、/opsx:propose | proposal、UML、OpenAPI 草稿、兩份 tasks |
+| /issue-architect | architect | /issue-architect（依 `openspec instructions` 寫 artifact） | proposal、UML、OpenAPI 草稿、兩份 tasks |
 | /backend-processor | backend | /backend-processor、/opsx:apply | 後端 API（例：Django/DRF）、單元測試、migration |
 | /frontend-processor | frontend | /frontend-processor、/opsx:apply | 畫面切版、API 串接 |
 | /issue-integrator | integrator | /issue-integrator、/opsx:archive | 啟動檢查結果、歸檔、Linear 回寫、PR |
@@ -68,10 +68,10 @@ Chika 與 Yuma 在各自的 worktree 平行開發；Osamu 檢查失敗會退回�
 
 Subagent 之間不共享對話，所有交接都落在同一個 OpenSpec 變更目錄裡；每個 Agent 開工先讀、結束寫回，缺檔就停下回報。
 
-變更 ID 統一用 Linear issue 編號開頭，例如 `ENG-123-order-export`，前後端兩個 repo 用同一個 ID，方便對照與歸檔。
+變更 ID 統一用 Linear issue 編號開頭並**全小寫**（OpenSpec CLI 不接受大寫），例如 `eng-123-order-export`；前後端兩個 repo 用同一個 ID，方便對照與歸檔。分支名保留大寫的 issue 編號（`feature/ENG-123-order-export`），讓 Linear automation 認得。
 
 ```
-openspec/changes/ENG-123-order-export/
+openspec/changes/eng-123-order-export/
 ├── proposal.md     # 需求背景、範圍、驗收條件（來自 Linear）
 ├── design.md       # UML：資料流、時序圖（Mermaid）
 ├── openapi.yaml    # Swagger 草稿，前後端共同依據
@@ -100,8 +100,8 @@ openspec/changes/ENG-123-order-export/
 
 | 位置 | 專案具體路徑 | 放什麼 |
 | --- | --- | --- |
-| team-hq repo | `<team-hq-repo>` | 四個 agent 定義檔、/ship-issue、/issue-architect、/issue-integrator、總覽用 CLAUDE.md |
-| 前端 monorepo | `<frontend-repo>` | CLAUDE.md、/frontend-processor skill、openspec/、前端 lint 與型別檢查 hook |
+| team-hq repo | `<team-hq-repo>` | 四個 agent 定義檔、/ship-issue、/issue-architect、/issue-integrator、/frontend-processor（含前端 lint hook）、寫入限制 hook、總覽用 CLAUDE.md |
+| 前端 monorepo | `<frontend-repo>` | CLAUDE.md、openspec/ |
 | 後端 monorepo | `<backend-repo>` | CLAUDE.md、/backend-processor skill、openspec/、後端測試與 migration hook |
 
 ```
@@ -110,20 +110,22 @@ openspec/changes/ENG-123-order-export/
 │   ├── CLAUDE.md       # 前後端 repo 路徑、worktree 慣例
 │   └── .claude/
 │       ├── agents/     # hyuse.md chika.md yuma.md osamu.md
-│       └── commands/   # ship-issue.md
+│       ├── commands/   # ship-issue.md
+│       ├── hooks/      # guard-write-scope.sh
+│       └── skills/     # issue-architect、issue-integrator、frontend-processor 與相依
 ├── frontend/           # 前端 monorepo
 ├── backend/            # 後端 monorepo
 └── wt/                 # 各 issue 的 worktree
 ```
 
-平常從 team-hq 啟動，用 additional directories 設定（或 `--add-dir`）加入前後端 repo 與 wt/。Chika 進到後端 worktree 時，會自動讀到後端的 CLAUDE.md 與 /backend-processor。
+平常從 team-hq 啟動，用 additional directories 設定（或 `--add-dir`）加入前後端 repo 與 wt/。Hyuse、Yuma、Osamu 讀 team-hq 的 skill；Chika 讀後端 repo 的 /backend-processor。兩邊不對稱的原因：`backend-processor` 的 lint hook 以後端 repo 路徑註冊，也可能被後端 repo 自己的 `.claude/settings.json` 使用，所以裝在後端；其餘三個 skill 只在 team-hq 被呼叫，隨 `install.sh agent-team` 一起安裝並在重跑時更新。
 
 - [ ] 建立 team-hq repo，放入四個 agent 定義檔與 /ship-issue
 - [ ] 在 team-hq 的 CLAUDE.md 寫明前後端 repo 路徑與 worktree 慣例
 - [ ] 設定 additional directories，確認從 team-hq 能讀寫兩個 repo 與 wt/
 - [ ] 在後端 repo 安裝 /backend-processor（含編輯後 lint hook 與規格同步說明 `spec-sync/`）：
       `curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- backend-processor <backend-repo>`
-- [ ] /frontend-processor 目前不隨 littleduck-skills 提供，依同一結構自行放進前端 repo 的 `.claude/skills/`
+- [ ] 確認 team-hq 的 `.claude/skills/` 已有 `issue-architect`、`issue-integrator`、`frontend-processor`（`install.sh agent-team` 會一併安裝；重跑即更新 skill，但不覆寫已存在的骨架檔）
 
 * [ ] 決定 worktree 慣例：例如 `../wt/<repo>-<change-id>`，每個 issue 一組前後端 worktree
 * [ ] 前後端 repo 各自執行 OpenSpec 初始化，確認 /opsx:propose、/opsx:apply、/opsx:archive 可用
@@ -136,9 +138,9 @@ openspec/changes/ENG-123-order-export/
 
 ### Phase 1　Architect（第 1 週）
 
-- [ ] 把現有 /issue-architect 整理成 skill：讀 issue → 系統分析 → UML → OpenAPI 草稿 → /opsx:propose
-- [ ] 建立 `team-hq/.claude/agents/hyuse.md`（範本見下一節），掛上該 skill
-- [ ] 在 skill 中規定：同一個 change-id 在前後端各產生一份 `tasks.md`，任務標註 `[BE]` / `[FE]`
+- [ ] 檢視隨安裝提供的 /issue-architect：讀 issue → 系統分析 → UML → OpenAPI 草稿 → 前後端各一份變更目錄。它不呼叫 /opsx:propose（subagent 不能回答釐清問題），改依 `openspec instructions` 逐份寫 artifact
+- [ ] 把 `hyuse.md` 的 `<frontend-repo>` 等佔位換成實際路徑；寫入限制 hook 已在 frontmatter 註冊
+- [ ] 確認 skill 的規定符合你的專案：同一個 change-id 在前後端各產生一份 `tasks.md`，任務標註 `[BE]` / `[FE]`
 - [ ] 用 2 個已完成的舊 issue 試跑，比對產出與你當初實際做法的差異
 - [ ] 依差異修正 skill，直到你不需大改就能核准提案
 
@@ -146,27 +148,27 @@ openspec/changes/ENG-123-order-export/
 
 ### Phase 2　Backend 與 Frontend（第 2 週）
 
-- [ ] 把 /backend-processor、/frontend-processor 整理成 skill，第一步一律是讀 proposal、design、openapi、tasks
+- [ ] 檢視 /backend-processor（後端 repo）與 /frontend-processor（team-hq），兩者第一步都是讀 proposal、design、openapi、tasks；測試、lint 等指令取自各 repo 的 CLAUDE.md，沒寫就停下回報
 - [ ] 建立 `chika.md`、`yuma.md`，各自限定只在自己的 worktree 工作
 - [ ] backend skill 寫明完成定義：API 通過單元測試、migration 可正反向執行、openapi.yaml 已定稿
 - [ ] frontend skill 寫明：先用 openapi.yaml 產生型別或 mock，後端未完成也能先切版
 - [ ] 先依序跑（先 BE 後 FE），穩定後再試平行
-- [ ] 加上 hook：編輯檔案後自動跑 lint / 型別檢查。後端用 /backend-processor 附帶的 `hooks/post-edit-lint.sh`：`chika.md` 範本的 frontmatter 已註冊（把 `<backend-repo>` 換成實際路徑）；不想綁在 Agent 上時，改在後端 repo 的 `.claude/settings.json` 加同樣的 PostToolUse hook（matcher `Write|Edit`）。lint 指令可用環境變數 `LITTLEDUCK_LINT_CMD` 指定，未指定時自動偵測 `./pants` 或 ruff，都沒有就不跑
+- [ ] 加上 hook：編輯檔案後自動跑 lint / 型別檢查。後端用 /backend-processor 附帶的 `hooks/post-edit-lint.sh`：`chika.md` 範本的 frontmatter 已註冊（把 `<backend-repo>` 換成實際路徑）；不想綁在 Agent 上時，改在後端 repo 的 `.claude/settings.json` 加同樣的 PostToolUse hook（matcher `Write|Edit`）。lint 指令可用環境變數 `LITTLEDUCK_LINT_CMD` 指定，未指定時自動偵測 `./pants` 或 ruff，都沒有就不跑。前端用 /frontend-processor 附帶的 `hooks/post-edit-lint.sh`，已在 `yuma.md` 註冊（路徑以 `$CLAUDE_PROJECT_DIR` 指向 team-hq，不需替換）；lint 指令可用 `LITTLEDUCK_FE_LINT_CMD` 指定，未指定時有 eslint 設定檔與本地 eslint 才跑
 
 完成標準：一個前後端都有改動的 issue，兩個 Agent 各自完成 tasks，且 handoff.md 紀錄完整。
 
 ### Phase 3　Integrator（第 2–3 週）
 
-- [ ] 把 /issue-integrator 整理成 skill：啟動前後端 → 跑全部測試 → 核對 tasks 全勾 → 比對兩份 openapi.yaml
-- [ ] 建立 `osamu.md`：發現問題只寫進 handoff.md 並退回，不自行修改程式碼
-- [ ] 檢查全過才執行 /opsx:archive、回寫 Linear 狀態與摘要、開前後端 PR
+- [ ] 檢視隨安裝提供的 /issue-integrator：實際跑兩端測試 → 核對 tasks 全勾 → 比對兩份 openapi.yaml → 規格同步閘門 → 重切 commit 並開 PR；user 回覆「歸檔」後才歸檔並回寫 Linear
+- [ ] 確認 `osamu.md` 的寫入限制 hook 生效：發現問題只寫進 handoff.md 並退回，不自行修改程式碼
+- [ ] 在 team-hq `CLAUDE.md` 的 repo 表填好兩端主幹，Osamu 開 PR 時以它為 base
 - [ ] 刻意製造一個錯誤（例如欄位名不一致），確認 Osamu 會退回而不是放行
 
 完成標準：Osamu 能正確擋下刻意製造的錯誤，正常 issue 能產出可審查的 PR。
 
 ### Phase 4　總指揮與自動化（第 3 週）
 
-- [ ] 建立 `/ship-issue <issue-id>` 指令，串起四個 Agent（範本見下一節）
+- [ ] 檢視隨安裝提供的 `/ship-issue <issue-id>`，串起四個 Agent（摘要見下一節）
 - [ ] 前後端改用平行執行，各自使用獨立 worktree
 - [ ] 設定退回上限：同一階段退回 2 次就停下來交給你
 - [ ] 用 3 個新 issue 端到端跑完，記錄每個 issue 你介入的次數與原因
@@ -175,80 +177,19 @@ openspec/changes/ENG-123-order-export/
 
 ## 範本
 
-以下範本可以直接複製再修改。agent 定義檔放 `team-hq/.claude/agents/`，總指揮指令放 `team-hq/.claude/commands/`（見 Phase 0）；frontmatter 可用欄位以你目前 Claude Code 版本的官方文件為準。
+完整範本已隨 `install.sh agent-team` 放進 team-hq，直接修改即可；frontmatter 可用欄位以你目前 Claude Code 版本的官方文件為準。這裡只列每個檔案的重點，避免與實際檔案不同步。
 
-### Agent 定義檔：hyuse.md（architect）
+| 檔案 | 重點 |
+| --- | --- |
+| `.claude/agents/hyuse.md` | opus；照 `/issue-architect`；PreToolUse 掛 `guard-write-scope.sh hyuse`，只能寫 `openspec/`；不能問 user，疑問列成待確認問題回傳 |
+| `.claude/agents/chika.md` | sonnet；照後端 repo 的 `/backend-processor`；PostToolUse 掛後端 lint hook（`<backend-repo>` 要換成實際路徑） |
+| `.claude/agents/yuma.md` | sonnet；照 team-hq 的 `/frontend-processor`；PostToolUse 掛前端 lint hook；不改 `openapi.yaml` |
+| `.claude/agents/osamu.md` | sonnet；照 `/issue-integrator`；PreToolUse 掛 `guard-write-scope.sh osamu`；不採信前一棒、不自己修、只在重切後用 `--force-with-lease` |
+| `.claude/commands/ship-issue.md` | 先問完 user 再派工；檢查點 1 核准時提交並推送提案；依序派 Chika、Yuma；Osamu 檢查與退回上限；檢查點 2 回覆「歸檔」後才派 Osamu 歸檔 |
+| `.claude/hooks/guard-write-scope.sh` | Hyuse 與 Osamu 共用的寫入範圍限制；管不到 Bash，靠定義檔明文禁止 |
+| `openspec/handoff-template.md` | 「## 狀態」區塊就地改值，下方各角色紀錄只追加 |
 
-```markdown
----
-name: hyuse
-description: 系統架構師。收到 Linear issue 需要分析需求、產生 UML、OpenAPI 草稿與 OpenSpec 提案時使用。
-tools: Read, Grep, Glob, Write, mcp__linear
-model: opus
----
-你是系統架構師 Hyuse，負責把 Linear issue 轉成前後端都能直接執行的規格。
-
-開工：
-- 用 Linear MCP 讀取 issue 內容與留言
-- 讀前後端 repo 的 CLAUDE.md 與相關既有程式碼
-
-執行 /issue-architect skill，產出 openspec/changes/<change-id>/ 下的
-proposal.md、design.md、openapi.yaml，並在前後端各執行 /opsx:propose 建立 tasks.md。
-
-邊界：
-- 只能寫 openspec/ 目錄，不得修改任何程式碼
-- 需求不明確時，列出問題並停下，不要自行假設
-
-結束：在 handoff.md 追加紀錄，回報 change-id、任務數、待確認問題。
-```
-
-### Agent 定義檔：chika.md（backend）
-
-```markdown
----
-name: chika
-description: 後端工程師。依 OpenSpec 提案在後端 worktree 開發後端 API、單元測試與資料庫遷移時使用。
-tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
----
-你是後端工程師 Chika。
-
-開工：讀 proposal.md、design.md、openapi.yaml、tasks.md 中標註 [BE] 的任務。
-缺少任何一份就停下回報，不要開始寫程式。
-
-執行 /backend-processor skill，依它的步驟完成 [BE] 任務；進度以 handoff.md 的「## 狀態」區塊為準。
-
-完成定義：
-- 新增或修改的 API 都有單元測試且全部通過
-- migration 可正向與反向執行
-- openapi.yaml 與實作一致；有改欄位就在 handoff.md 註明
-- 狀態區塊階段為 integrating，worktree 乾淨且已推送
-
-邊界：只在後端 worktree 內工作，不改 proposal.md。
-```
-
-yuma.md 與 osamu.md 依同一結構撰寫，差別在 `tools`、邊界與完成定義（見「團隊編制」表格）；四份完整範本已隨安裝放在 `.claude/agents/`。
-
-### 總指揮指令：/ship-issue
-
-```markdown
----
-description: 從 Linear issue 到 PR 的完整流程
-argument-hint: <linear-issue-id>
----
-處理 Linear issue $ARGUMENTS：
-
-1. 為前後端各建立 worktree，路徑 ../wt/<repo>-<change-id>
-2. 交給 hyuse 產生提案。完成後停下，摘要提案內容給我確認。
-   【檢查點 1】我回覆「核准」才繼續；有修改意見就交回 hyuse。
-3. 同時交給 chika（後端 worktree）與 yuma（前端 worktree）。
-4. 交給 osamu 檢查。若 osamu 退回，依 handoff.md 交回對應的人修正，
-   同一階段最多退回 2 次，超過就停下來告訴我。
-5. osamu 檢查通過後，摘要結果與 PR 連結給我。
-   【檢查點 2】我回覆「歸檔」後，osamu 才執行 /opsx:archive 並回寫 Linear。
-```
-
-平常也可以單點呼叫，例如「Chika 幫我在後端執行 /backend-processor」或「Osamu 幫我檢查 ENG-123」。
+平常也可以單點呼叫，例如「Chika 幫我在後端執行 /backend-processor」或「Osamu 幫我檢查 eng-123-order-export」。
 
 ## 檢查點、風險與驗收
 
