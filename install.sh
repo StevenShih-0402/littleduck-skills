@@ -4,7 +4,8 @@
 # 依選項把本 repo 的可散佈資產同步進目標專案：
 #   <skill 名稱>  該 skill 與它在 install.deps 宣告的相依（其他 skill、指令、linear/ 模板、spec-sync/ 說明）
 #   all           除 agent-team 以外的全部 skills、commands、linear/ 模板、spec-sync/ 說明
-#   agent-team    多 Agent 協作中樞（team-hq）骨架；已存在的檔案一律略過
+#   agent-team    多 Agent 協作中樞（team-hq）骨架（已存在的檔案一律略過），
+#                 加上 install.deps 的 agent-team 列宣告的角色 skill 及其相依（每次覆寫更新）
 # 除 agent-team 外，目標專案沒有 CLAUDE.md 時會一併建立通用開發習慣的 CLAUDE.md（已存在則不覆寫）。
 #
 # 用法（遠端，免 clone）：
@@ -149,7 +150,7 @@ usage() {
   list_names | sed 's/^/  /'
   echo
   echo "  all        = 除 agent-team 以外全部"
-  echo "  agent-team = 多 Agent 協作中樞骨架（已存在的檔案不覆寫）"
+  echo "  agent-team = 多 Agent 協作中樞骨架（已存在的檔案不覆寫）＋角色 skill"
 }
 
 # --- 解析參數 ---
@@ -252,6 +253,16 @@ install_kit() {
   echo "提示：範本更新不會覆寫已存在的檔案；要取新版請先移除或改名舊檔再重跑。"
 }
 
+# kit_skills：印出 install.deps 中 agent-team 列宣告的角色 skill，一行一個；該列只能寫 skill:
+kit_skills() {
+  for asset in $(deps_of agent-team); do
+    case $asset in
+      skill:*) echo "${asset#skill:}" ;;
+      *) echo "錯誤：install.deps 的 agent-team 列只能寫 skill:，發現：$asset" >&2; exit 1 ;;
+    esac
+  done
+}
+
 # deps_of <skill>：印出 install.deps 中該 skill 宣告的資產，一行一個
 deps_of() {
   [ -f "$DEPS_FILE" ] || return 0
@@ -301,7 +312,16 @@ install_selected() {
 
 case $SELECTION in
   agent-team)
+    # 先讀清單再裝骨架：agent-team 列格式錯誤時，指令替換失敗會讓 set -e 在寫入任何檔案前中止
+    role_skills=$(kit_skills)
     install_kit
+    if [ -n "$role_skills" ]; then
+      echo
+      echo "安裝角色 skill（每次覆寫更新）："
+      install_selected "$(echo "$role_skills" | tr '\n' ' ' | sed 's/ *$//')"
+      echo
+      echo "完成：角色 skill 及其相依已安裝/更新到 $TARGET"
+    fi
     ;;
   all)
     copy_contents "$REPO_DIR/.claude/skills"   "$TARGET/.claude/skills"
