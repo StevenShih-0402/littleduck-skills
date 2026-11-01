@@ -2,7 +2,9 @@
 
 ## Purpose
 提供單一安裝／更新指令，讓外部專案依選項（單一 skill、全部或 agent-team）把本 repo 的 skills、指令、模板與通用 CLAUDE.md 同步進專案。
+
 ## Requirements
+
 ### Requirement: External projects can install skills via a command
 
 The repository SHALL provide a single install/update command (a shell script) that an external project can run to copy a user-selected subset of this repo's distributable assets into that project. The selection is a required first argument: a single skill name, `all`, or `agent-team`. Installing a skill MUST also install the assets it depends on (other skills, `.claude/commands/` entries, and root `linear/` templates).
@@ -71,17 +73,30 @@ The installer MUST refuse to install when the selection argument is missing or n
 
 ### Requirement: Agent team kit is installed only on explicit selection
 
-The agent team kit SHALL be installed only when the selection is `agent-team`; `all` and single skill names MUST NOT install any kit file.
+The agent team kit SHALL be installed only when the selection is `agent-team`; `all` and single skill names MUST NOT install any kit file. Selecting `agent-team` SHALL also install the role skills listed for `agent-team` in `install.deps` (`issue-architect`, `issue-integrator`, `frontend-processor`) together with their recursively expanded dependencies, using the same overwrite-on-update behaviour as single skill installs, while kit files keep the skip-if-present behaviour.
 
 #### Scenario: all excludes the kit
 
 - **WHEN** the command is run with `all`
-- **THEN** no agent definition templates, `ship-issue` command, or workflow setup document from the kit appear in the target
+- **THEN** no agent definition templates, `ship-issue` command, write-scope hook, or workflow setup document from the kit appear in the target
 
 #### Scenario: agent-team installs the kit
 
 - **WHEN** the command is run with `agent-team`
 - **THEN** the kit is installed into the target as a scaffold that skips files already present
+
+#### Scenario: agent-team installs the role skills
+
+- **WHEN** the command is run with `agent-team` against an empty directory
+- **THEN** `.claude/skills/` in the target contains `issue-architect`, `issue-integrator` and `frontend-processor`
+- **AND** their dependencies (`issue-reader`, `issue-processor`, `issue-solver`, the `openspec-*` skills, `draw-mermaid`, the `opsx` commands, `linear/` and `spec-sync/`) are installed
+- **AND** no generic `CLAUDE.md` replaces the kit's team-hq `CLAUDE.md`
+
+#### Scenario: Re-running agent-team updates skills but not customised kit files
+
+- **WHEN** the target already has an edited `.claude/agents/hyuse.md` and an outdated `.claude/skills/issue-architect/SKILL.md`, and the command is run with `agent-team` again
+- **THEN** `hyuse.md` is unchanged and reported as skipped
+- **AND** `issue-architect/SKILL.md` is replaced by this repo's version
 
 ### Requirement: Shared CLAUDE.md delivered without overwriting
 

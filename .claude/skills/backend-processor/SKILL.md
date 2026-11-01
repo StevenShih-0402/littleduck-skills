@@ -11,7 +11,7 @@ description: 多 Agent 流程的後端實作（Chika）：讀 OpenSpec 變更目
 
 ## 輸入
 
-- change-id（以 Linear issue 代號開頭，例：`ENG-123-order-export`）
+- change-id（全小寫、以 Linear issue 代號開頭，例：`eng-123-order-export`；OpenSpec CLI 不接受大寫）
 - 後端 worktree 路徑（以下稱 `<backend-worktree>`）
 - 前端 worktree 與其變更目錄路徑（change 涉及前端時）
 - 「接續模式」（選填）：中斷後重新派工時帶入，代表這個 change 已有進度。
@@ -33,7 +33,7 @@ description: 多 Agent 流程的後端實作（Chika）：讀 OpenSpec 變更目
 - **任何一份不存在就停下回報缺檔**，不要開始實作。
 - `handoff.md` 沒有狀態區塊（`## 狀態`）就停下回報，提示 user 依新版 `handoff-template.md` 補上，不要自行補建。
 - **分支**：有 `.linear.md` 時，`git -C <backend-worktree> branch --show-current` 必須等於它的 `branch`；沒有 `.linear.md` 時，目前分支不得是預設分支。不符就停下回報。
-- **ISSUE-ID**：有 `.linear.md` 取 `primary_issue`，否則取 change-id 開頭的 Linear 代號（`[A-Z][A-Z0-9]*-\d+`）。
+- **ISSUE-ID**：有 `.linear.md` 取 `primary_issue`，否則從 change-id 開頭擷取 Linear 代號（`[a-z][a-z0-9]*-\d+`，不分大小寫）並轉成大寫。
 - 只處理 `tasks.md` 中 `[BE]` 開頭的項目。
 
 ### 接續檢查（依序；非接續模式也要做第 1、2 點）
@@ -60,8 +60,8 @@ description: 多 Agent 流程的後端實作（Chika）：讀 OpenSpec 變更目
 範例（ISSUE-ID 為 ENG-200、任務 2.1）：
 
 ```bash
-git -C <backend-worktree> add openspec/changes/ENG-200-export/tasks.md \
-                              openspec/changes/ENG-200-export/handoff.md \
+git -C <backend-worktree> add openspec/changes/eng-200-export/tasks.md \
+                              openspec/changes/eng-200-export/handoff.md \
                               src/apps/export/views.py \
                               tests/apps/export/test_views.py
 git -C <backend-worktree> commit -m "wip(ENG-200): 2.1 新增匯出 API

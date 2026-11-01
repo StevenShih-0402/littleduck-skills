@@ -1,6 +1,6 @@
 # 規格同步閘門（spec-sync）
 
-> 隨 littleduck-skills 的 `issue-solver`、`backend-processor` 安裝。
+> 隨 littleduck-skills 的 `issue-*`、`backend-processor`、`frontend-processor` 安裝（`issue-architect`、`issue-integrator` 經由 `issue-reader` 的相依一併帶入）。
 
 讓專案宣告「改到哪些程式路徑，就必須一起寫哪份規格」，在變更過程中**偵測漏寫**。
 
@@ -54,12 +54,15 @@ rules:
 
 ## 各 skill 的時機與處置
 
-delta 必須在歸檔前寫好，所以檢查前移到實作階段；`issue-solver` 保留為歸檔前的最終閘門，**免同步只在最終閘門宣告**。
+delta 必須在歸檔前寫好，所以檢查前移到實作階段。最終閘門在單人流程是 `issue-solver`，在多 Agent 流程是 `issue-integrator`；**免同步只在最終閘門確認**（多 Agent 流程由開發 Agent 先在 `handoff.md` 聲明，user 在檢查點 2 確認）。
 
 | skill | 時機 | 不通過時 |
 |-------|------|----------|
 | `backend-processor` | 每項任務內 | 改到命中規則的路徑時，**同一項任務內**補上：`capability` 寫或更新 change 的 delta，`spec_dir` 更新文件本身，一起 commit。屬 `exempt_when` 的情形時，改在 `handoff.md` 的 backend 節逐目標寫一行：`- **規格免同步**：<目標> — <理由>`，交由最終閘門確認 |
+| `frontend-processor` | 每項任務內 | 同 `backend-processor`，免同步聲明寫在 `handoff.md` 的 frontend 節 |
+| `issue-architect` | 寫提案時 | 預計改到的路徑命中 `capability` 規則時，在 `specs/` 先寫 delta；命中 `spec_dir` 規則時，在 `tasks.md` 排一項更新該文件的任務 |
 | `issue-processor` | `/opsx:apply` 完成後 | 以 **AskUserQuestion** 列出不通過的目標與觸發路徑，讓 user 選：**現在補上**（寫 delta 或更新文件，同屬本次實作）／**留給 issue-solver 決定** |
 | `issue-solver` | `/opsx:archive` 之前（最終閘門） | 以 **AskUserQuestion** 讓 user 選：**先補規格後重跑**（本次停止、不歸檔）／**宣告免同步並提供理由**（僅限 `exempt_when` 描述的情形；逐目標記下理由並寫進 PR 內文；`handoff.md` 已有的免同步聲明一併列出供確認）／**中止**。未取得回覆前不得歸檔 |
+| `issue-integrator` | 檢查段（最終閘門） | 各端依自己 repo 的設定檔判定。不通過的目標若該端 `handoff.md` 有 `- **規格免同步**：<目標> — <理由>`，放行並列進報告，由 user 在檢查點 2 確認；沒有聲明就退回該端的開發 Agent。規則設定錯誤時退回 architect |
 
 報告逐條規則列出結果：不適用／通過（`capability` 註明「歸檔時由 sync 寫入主規格」）／免同步（目標與理由）。
