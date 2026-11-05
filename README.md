@@ -8,6 +8,7 @@
   - `issue-reader` / `issue-processor` / `issue-solver` — 三段式 Linear → OpenSpec 流程
   - `openspec-*` — OpenSpec 提案／實作／歸檔／同步
   - `gen-html` — 用單檔 HTML 產生架構圖、流程圖、比較表等
+  - `gen-story` — 把一個 OpenSpec 變更做成對話劇本式的單檔 HTML 導覽投影片（版面檢查腳本需要 playwright）
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
   - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
   - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、檢查／審查後收尾／歸檔棒，隨 `agent-team` 一起安裝
@@ -81,7 +82,7 @@ rm littleduck-install.sh
 | `<skill 名稱>` | 該 skill，加上它在 `install.deps` 宣告的相依（見下） |
 | `issue-reader` / `issue-processor` / `issue-solver` | 三段式 skill 一起裝，加上全部 `openspec-*` skill、`.claude/commands/opsx/`、`linear/` 模板、`spec-sync/` |
 | `openspec-<名稱>` | 該 skill 與對應的 `.claude/commands/opsx/*.md` 指令 |
-| `gen-html`、`draw-mermaid` | 只有該 skill 本身 |
+| `gen-html`、`gen-story`、`draw-mermaid` | 只有該 skill 本身 |
 | `backend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；裝在後端 repo，供 agent-team 的後端 Agent 使用 |
 | `frontend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；`agent-team` 已會裝進 team-hq，只有想在前端 repo 單獨使用時才需另外安裝 |
 | `issue-architect` / `issue-integrator` | 該 skill，加上整組 issue 流程（同 `issue-reader`）；`issue-architect` 另帶 `draw-mermaid` |
