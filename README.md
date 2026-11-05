@@ -10,12 +10,13 @@
   - `gen-html` — 用單檔 HTML 產生架構圖、流程圖、比較表等
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
   - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
-  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、檢查與歸檔棒，隨 `agent-team` 一起安裝
+  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、檢查／審查後收尾／歸檔棒，隨 `agent-team` 一起安裝
+  - `custom-review` — 多 Agent 流程的 reviewer（Shiori）：對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，並評定內建 `/code-review` 發現，隨 `agent-team` 一起安裝
 - `.claude/commands/` — `opsx` 等 slash 指令
 - `linear/` — Linear 回填模板（question / analyze / change）
 - `spec-sync/` — 規格同步閘門的設定檔格式與範例（專案放 `openspec/spec-sync.yaml` 才啟用）
 - `CLAUDE.md` — 跨專案通用的開發習慣
-- `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架，含寫入範圍限制 hook（只在選 `agent-team` 時安裝）
+- `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架（五個角色含審查員 Shiori、`/ship-issue` 含程式碼審查步驟、`review.md` 範本、寫入範圍限制 hook；只在選 `agent-team` 時安裝）
 
 ## 安裝 / 更新到其他專案
 
@@ -85,7 +86,7 @@ rm littleduck-install.sh
 | `frontend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；`agent-team` 已會裝進 team-hq，只有想在前端 repo 單獨使用時才需另外安裝 |
 | `issue-architect` / `issue-integrator` | 該 skill，加上整組 issue 流程（同 `issue-reader`）；`issue-architect` 另帶 `draw-mermaid` |
 | `all` | 除 agent-team 外的全部 `.claude/skills/`、`.claude/commands/`、`linear/`、`spec-sync/` |
-| `agent-team` | 骨架：`CLAUDE.md`（team-hq 版）、`.claude/agents/` 四個角色、`.claude/commands/ship-issue.md`、`.claude/hooks/guard-write-scope.sh`、`docs/multi-agent-workflow.md`、`openspec/handoff-template.md`；再加上角色 skill `issue-architect`、`issue-integrator`、`frontend-processor` 與它們的相依（issue 流程、`openspec-*`、`draw-mermaid`、`opsx` 指令、`linear/`、`spec-sync/`）。`backend-processor` 不在其中，要另外裝到後端 repo |
+| `agent-team` | 骨架：`CLAUDE.md`（team-hq 版）、`.claude/agents/` 五個角色（hyuse／chika／yuma／osamu／shiori）、`.claude/commands/ship-issue.md`、`.claude/hooks/guard-write-scope.sh`、`docs/multi-agent-workflow.md`、`openspec/handoff-template.md`、`openspec/review-template.md`；再加上角色 skill `issue-architect`、`issue-integrator`、`frontend-processor`、`custom-review` 與它們的相依（issue 流程、`openspec-*`、`draw-mermaid`、`opsx` 指令、`linear/`、`spec-sync/`）。`backend-processor` 不在其中，要另外裝到後端 repo |
 
 skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它會呼叫其他 skill、指令或模板，記得在這裡補上。
 
@@ -99,6 +100,7 @@ skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它�
 這也代表本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑。
 例如 `openspec/handoff-template.md` 新增了「## 狀態」區塊，`backend-processor` 依賴它，舊骨架要先移除該檔再重跑才拿得到。
 又例如 `hyuse.md`、`yuma.md`、`osamu.md`、`ship-issue.md` 改為引用隨附的角色 skill 與 hook；用舊骨架建立的 team-hq 要先移除這幾個檔再重跑。
+加入審查員 Shiori 後，新增的骨架檔 `.claude/agents/shiori.md` 與 `openspec/review-template.md` 也是「不存在才建立」，`osamu.md`、`ship-issue.md` 則改成「檢查 → 程式碼審查 → 收尾」流程；已安裝的 team-hq 要取這些更新，同樣得先移除舊的 `osamu.md`、`ship-issue.md` 再重跑（`custom-review` skill 會自動覆寫更新）。
 
 角色 skill（`issue-architect`、`issue-integrator`、`frontend-processor` 與其相依）則和其他 skill 一樣**每次重跑都覆寫更新**，請勿在 team-hq 直接修改。
 安裝後把 `CLAUDE.md` 與 agent 定義裡的 `<frontend-repo>`、`<backend-repo>` 等佔位換成實際路徑，完整說明見 `docs/multi-agent-workflow.md`。

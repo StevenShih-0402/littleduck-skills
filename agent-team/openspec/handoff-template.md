@@ -5,10 +5,11 @@
 
 <!-- 就地改值，不追加。中斷後重新派工時，開發 Agent 以這裡判斷從哪裡接續；不寫 commit SHA（以 git log --grep "wip(<ISSUE-ID>): <任務編號>" 對應）。
   階段由誰寫入：proposal（architect 建立；核准時主對話更新「最後完成」）→ backend／frontend（開發 Agent 開工）
-  → integrating（開發 Agent 交接；integrator 檢查通過後維持，下一步「等待 user 回覆歸檔」）→ archived（integrator 歸檔）。
-  integrator 退回時改回 backend／frontend（退回 architect 為 proposal）。 -->
+  → integrating（開發 Agent 交接）→ reviewing（integrator 檢查通過；主對話跑程式碼審查）
+  → ready-to-archive（integrator 收尾重切並開 PR 後）→ archived（integrator 歸檔）。
+  integrator 檢查退回或程式碼審查退回時改回 backend／frontend（退回 architect 為 proposal）。 -->
 
-- **階段**：proposal <!-- proposal | backend | frontend | integrating | archived -->
+- **階段**：proposal <!-- proposal | backend | frontend | integrating | reviewing | ready-to-archive | archived -->
 - **最後完成**：無
 - **下一步**：<任務編號或等待誰>
 - **暫停原因**：無
