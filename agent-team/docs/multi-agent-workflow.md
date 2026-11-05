@@ -4,20 +4,22 @@
 
 ## 目標與現況
 
-目標：把新版流程圖上的四個階段，各交給一個專職 Agent，由主對話（你）統一分派，約三週完成導入。
+目標：把新版流程圖上的四個開發階段各交給一個專職 Agent，並在 Osamu 檢查之後加一道程式碼審查，由主對話（你）統一分派。
 
-現況是一個 Agent 從讀 Linear 到寫 code 一路做完，context 越做越長，前後端也無法平行。新版流程已經切好四個階段，這份計畫做的是三件事：
+現況是一個 Agent 從讀 Linear 到寫 code 一路做完，context 越做越長，前後端也無法平行。新版流程已經切好四個階段，這份計畫做的是四件事：
 
 1. 每個階段變成一個 subagent（角色、權限、模型），原本的 slash command 收進該角色的 skill。
 2. OpenSpec 變更目錄成為角色之間唯一的交接介面，規定誰讀什麼、寫什麼。
 3. 用一個總指揮指令 `/ship-issue` 串起全流程，並在兩處保留人工確認。
+4. 在 Osamu 的機械檢查（測試、lint、契約）之後，由內建 `/code-review` 與審查員 Shiori 對照規格審查 diff 的需求覆蓋與邏輯正確性。
 
 | 流程圖階段 | 對應 Agent | 主要 skill / 指令 | 產出 |
 | --- | --- | --- | --- |
 | /issue-architect | architect | /issue-architect（依 `openspec instructions` 寫 artifact） | proposal、UML、OpenAPI 草稿、兩份 tasks |
 | /backend-processor | backend | /backend-processor、/opsx:apply | 後端 API（例：Django/DRF）、單元測試、migration |
 | /frontend-processor | frontend | /frontend-processor、/opsx:apply | 畫面切版、API 串接 |
-| /issue-integrator | integrator | /issue-integrator、/opsx:archive | 啟動檢查結果、歸檔、Linear 回寫、PR |
+| /issue-integrator（檢查、收尾） | integrator | /issue-integrator、/opsx:archive | 啟動檢查結果、重切 commit、PR、歸檔、Linear 回寫 |
+| 程式碼審查 | reviewer | 內建 /code-review、/custom-review | review.md（審查發現與處理結果） |
 
 ```mermaid
 flowchart LR
@@ -30,8 +32,10 @@ flowchart LR
         Frontend("Yuma 前端 worktree")
     end
     Integrator{"Osamu 檢查通過？"}
+    Review{"程式碼審查通過？"}
+    Finish("Osamu 收尾：重切、開 PR")
     Gate2{"檢查點 2：同意歸檔？"}
-    Done(["歸檔、回寫 Linear、PR"])
+    Done(["歸檔、回寫 Linear"])
 
     %% 連線區
     Issue ==> Architect
@@ -39,12 +43,15 @@ flowchart LR
     Gate1 -- "退回修改" --> Architect
     Gate1 == "核准" ==> Develop
     Develop ==> Integrator
-    Integrator -- "退回，最多 2 次" --> Develop
-    Integrator == "通過" ==> Gate2
+    Integrator -- "退回" --> Develop
+    Integrator == "通過" ==> Review
+    Review -- "退回（與檢查共用上限 2 次）" --> Develop
+    Review == "通過" ==> Finish
+    Finish ==> Gate2
     Gate2 == "歸檔" ==> Done
 ```
 
-Chika 與 Yuma 在各自的 worktree 平行開發；Osamu 檢查失敗會退回開發者，同一階段最多兩次。
+Chika 與 Yuma 在各自的 worktree 平行開發；Osamu 檢查失敗或程式碼審查退回都會回到開發者，兩者共用「同一階段最多兩次」的退回上限。內建 `/code-review` 與 Shiori 的審查通過後，Osamu 才重切 commit、開 PR。
 
 ## 團隊編制
 
@@ -55,13 +62,17 @@ Chika 與 Yuma 在各自的 worktree 平行開發；Osamu 檢查失敗會退回�
 | architect | Hyuse | 讀 Linear、系統分析、寫 UML 與 OpenAPI 草稿、執行 /opsx:propose | Read、Grep、Glob、Write（限 openspec/）、Linear MCP | opus | 前後端兩個 repo 的 openspec/ |
 | backend | Chika | 依後端 tasks 開發 API、單元測試、migration | Read、Edit、Write、Bash | sonnet | 後端 worktree |
 | frontend | Yuma | 依前端 tasks 切版、依 OpenAPI 串接 API | Read、Edit、Write、Bash | sonnet | 前端 worktree |
-| integrator | Osamu | 啟動檢查、核對 tasks、/opsx:archive、回寫 Linear、開 PR | Read、Grep、Bash、Linear MCP、gh | sonnet | 兩個 worktree（唯讀為主） |
+| integrator | Osamu | 啟動檢查、核對 tasks、審查後重切 commit、/opsx:archive、回寫 Linear、開 PR | Read、Grep、Bash、Linear MCP、gh | sonnet | 兩個 worktree（唯讀為主） |
+| reviewer | Shiori | 對照 proposal、specs、openapi.yaml 審查 diff：需求有沒有實作、邊界有沒有測、邏輯是否正確；評定 /code-review 發現 | Read、Grep、Glob（唯讀） | opus | 兩個 worktree 的變更目錄與 review-diff.patch |
 
 分工原則：
 
 - **Agent 是「誰」，skill 是「怎麼做」。** 流程步驟寫在 skill，角色檔只寫身分、邊界與交接規則。改流程只改 skill。
-- **權限要真的限制。** architect 不改程式碼；integrator 不修 bug，發現問題就退回給 backend 或 frontend。
+- **權限要真的限制。** architect 不改程式碼；integrator 不修 bug，發現問題就退回給 backend 或 frontend；reviewer 只有唯讀工具。
 - **architect 用較強模型。** 規格錯了後面全錯，這一步最值得花 token；開發角色用 sonnet 控制成本。
+- **Shiori 只回報，不修改、不核准。** 她沒有寫入權限，審查結果由主對話寫進 `review.md`；她永遠不取代檢查點 2，也不能自動核准或合併 PR。
+- **Osamu 管「有沒有過」，Shiori 管「該測的有沒有測」。** Chika 與 Yuma 同時寫程式和測試，理解有偏差時兩者會一起錯、測試照樣通過，這是 Shiori 要補的缺口。
+- **審查規則依性質分三處放**（見 team-hq `CLAUDE.md`「審查規則三分法」）：機械性交給 linter、需判斷的慣例寫進各 repo `CLAUDE.md` 由內建 `/code-review` 審、對照規格的需求覆蓋放進 `/custom-review` 由 Shiori 審。
 - **後續擴編：** QA（Quinn，只能改 tests/，對照 spec 驗收）與演算法（Ada，寫 design.md 與 benchmark，用 opus）。
 
 ## 交接契約
@@ -77,7 +88,9 @@ openspec/changes/eng-123-order-export/
 ├── openapi.yaml    # Swagger 草稿，前後端共同依據
 ├── tasks.md        # 該 repo 的任務清單，完成就勾選
 ├── specs/          # OpenSpec 的需求差異
-└── handoff.md      # 各 Agent 的交接紀錄與退回原因
+├── handoff.md      # 各 Agent 的交接紀錄與退回原因
+├── review.md       # Shiori 與 /code-review 的審查發現與處理結果
+└── review-diff.patch  # 主對話備妥的 diff，供 Shiori 讀取（.gitignore，不進 commit）
 ```
 
 | 檔案 | 寫入者 | 讀取者 | 規則 |
@@ -87,12 +100,14 @@ openspec/changes/eng-123-order-export/
 | openapi.yaml | architect 起草、backend 定稿 | frontend、integrator | backend 改欄位必須同步更新並在 handoff.md 註明 |
 | tasks.md | architect 建立、開發者勾選 | integrator | 每個任務標註 `[BE]` 或 `[FE]`，勾選時附一行說明 |
 | handoff.md | 每個 Agent 完成時追加 | 下一個 Agent | 格式：角色、時間、做了什麼、未完成、風險 |
+| review.md | 主對話（代 Shiori 與 /code-review 寫入） | Chika、Yuma、Osamu、你 | 每條發現標註嚴重度、信心度、檔案與行號、對應需求；註明「退回」或「PR 備註」 |
+| review-diff.patch | 主對話 | Shiori | Shiori 只有 Read、Grep、Glob，看不到 git diff，所以由主對話先產生；列入各 repo `.gitignore` |
 
 前端 repo 的 `openapi.yaml` 是後端的副本。建議由 integrator 在檢查時比對兩份是否一致，不一致就退回。
 
 ## 執行步驟
 
-分五個階段，每階段都用一個真實的小 issue 跑一次再往下走；前一階段的完成標準沒過，就不要進下一階段。
+分六個階段（Phase 5 視需求導入），每階段都用一個真實的小 issue 跑一次再往下走；前一階段的完成標準沒過，就不要進下一階段。
 
 ### Phase 0　前置作業（第 1 週，約半天）
 
@@ -100,7 +115,7 @@ openspec/changes/eng-123-order-export/
 
 | 位置 | 專案具體路徑 | 放什麼 |
 | --- | --- | --- |
-| team-hq repo | `<team-hq-repo>` | 四個 agent 定義檔、/ship-issue、/issue-architect、/issue-integrator、/frontend-processor（含前端 lint hook）、寫入限制 hook、總覽用 CLAUDE.md |
+| team-hq repo | `<team-hq-repo>` | 五個 agent 定義檔（含 shiori）、/ship-issue、/issue-architect、/issue-integrator、/frontend-processor（含前端 lint hook）、/custom-review（Shiori 用）、寫入限制 hook、`review.md` 範本、總覽用 CLAUDE.md |
 | 前端 monorepo | `<frontend-repo>` | CLAUDE.md、openspec/ |
 | 後端 monorepo | `<backend-repo>` | CLAUDE.md、/backend-processor skill、openspec/、後端測試與 migration hook |
 
@@ -125,7 +140,8 @@ openspec/changes/eng-123-order-export/
 - [ ] 設定 additional directories，確認從 team-hq 能讀寫兩個 repo 與 wt/
 - [ ] 在後端 repo 安裝 /backend-processor（含編輯後 lint hook 與規格同步說明 `spec-sync/`）：
       `curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- backend-processor <backend-repo>`
-- [ ] 確認 team-hq 的 `.claude/skills/` 已有 `issue-architect`、`issue-integrator`、`frontend-processor`（`install.sh agent-team` 會一併安裝；重跑即更新 skill，但不覆寫已存在的骨架檔）
+- [ ] 確認 team-hq 的 `.claude/skills/` 已有 `issue-architect`、`issue-integrator`、`frontend-processor`、`custom-review`（`install.sh agent-team` 會一併安裝；重跑即更新 skill，但不覆寫已存在的骨架檔）
+- [ ] 在前後端兩個 repo 的 `.gitignore` 各加一行 `review-diff.patch`（程式碼審查用的暫存 diff，不進 commit）
 
 * [ ] 決定 worktree 慣例：例如 `../wt/<repo>-<change-id>`，每個 issue 一組前後端 worktree
 * [ ] 前後端 repo 各自執行 OpenSpec 初始化，確認 /opsx:propose、/opsx:apply、/opsx:archive 可用
@@ -175,6 +191,21 @@ openspec/changes/eng-123-order-export/
 
 完成標準：一般 issue 你只需在兩個檢查點介入。
 
+### Phase 5　Reviewer（流程穩定後，視需求導入）
+
+**啟用條件：** 檢查點 2 經常發現「需求沒實作、邊界沒測到、邏輯錯誤」而 Osamu 都放行了；或開始並行多個 issue，你無法每個 PR 都細看。
+
+- [ ] 依最新官方文件確認內建 `/code-review` 的行為；保留內建、**不要建立同名 skill**（會失去 effort／`--fix`／`ultra`）
+- [ ] 在各 repo 的 `CLAUDE.md` 補齊需要判斷的專案慣例（分層、錯誤格式、命名原則），內建 `/code-review` 依此審查
+- [ ] 確認命名、格式等機械性規則已由 linter 在 Osamu 檢查階段擋下，不交給 AI 審查
+- [ ] 確認 team-hq 已有 `/custom-review`（隨 `install.sh agent-team` 安裝）與 `shiori.md`、`review.md` 範本
+- [ ] 在 team-hq `CLAUDE.md` 填好「高風險檔案樣式」清單（依技術棧）
+- [ ] 在前後端兩個 repo 的 `.gitignore` 加 `review-diff.patch`
+- [ ] **Shadow mode**：前 N 個 issue（預設 5）只把審查結果彙報給你、不自動退回，於檢查點 2 逐條判定並記誤報率
+- [ ] 誤報率可接受後，經你同意才開啟自動退回：只有「高嚴重度且高信心」才退回，其餘列入 PR 備註
+
+完成標準：連續 N 個 issue 中，Shiori 退回的項目你都認同，且檢查點 2 發現的邏輯問題明顯減少。
+
 ## 範本
 
 完整範本已隨 `install.sh agent-team` 放進 team-hq，直接修改即可；frontmatter 可用欄位以你目前 Claude Code 版本的官方文件為準。這裡只列每個檔案的重點，避免與實際檔案不同步。
@@ -184,10 +215,12 @@ openspec/changes/eng-123-order-export/
 | `.claude/agents/hyuse.md` | opus；照 `/issue-architect`；PreToolUse 掛 `guard-write-scope.sh hyuse`，只能寫 `openspec/`；不能問 user，疑問列成待確認問題回傳 |
 | `.claude/agents/chika.md` | sonnet；照後端 repo 的 `/backend-processor`；PostToolUse 掛後端 lint hook（`<backend-repo>` 要換成實際路徑） |
 | `.claude/agents/yuma.md` | sonnet；照 team-hq 的 `/frontend-processor`；PostToolUse 掛前端 lint hook；不改 `openapi.yaml` |
-| `.claude/agents/osamu.md` | sonnet；照 `/issue-integrator`；PreToolUse 掛 `guard-write-scope.sh osamu`；不採信前一棒、不自己修、只在重切後用 `--force-with-lease` |
-| `.claude/commands/ship-issue.md` | 先問完 user 再派工；檢查點 1 核准時提交並推送提案；依序派 Chika、Yuma；Osamu 檢查與退回上限；檢查點 2 回覆「歸檔」後才派 Osamu 歸檔 |
+| `.claude/agents/osamu.md` | sonnet；照 `/issue-integrator`；PreToolUse 掛 `guard-write-scope.sh osamu`；不採信前一棒、不自己修；檢查通過只設 `reviewing`，收尾才重切並用 `--force-with-lease` |
+| `.claude/agents/shiori.md` | opus；唯讀 Read／Grep／Glob；照 `/custom-review`；只回報、不修改、不核准、不合併 |
+| `.claude/commands/ship-issue.md` | 先問完 user 再派工；檢查點 1 核准時提交並推送提案；依序派 Chika、Yuma；Osamu 檢查；5.5 跑內建 `/code-review` 與派 Shiori、寫 `review.md`；Osamu 收尾開 PR；檢查點 2 回覆「歸檔」後才派 Osamu 歸檔 |
 | `.claude/hooks/guard-write-scope.sh` | Hyuse 與 Osamu 共用的寫入範圍限制；管不到 Bash，靠定義檔明文禁止 |
 | `openspec/handoff-template.md` | 「## 狀態」區塊就地改值，下方各角色紀錄只追加 |
+| `openspec/review-template.md` | 每輪審查一節「第 N 輪」，只追加；模式／範圍／高風險檔案／發現表／結果 |
 
 平常也可以單點呼叫，例如「Chika 幫我在後端執行 /backend-processor」或「Osamu 幫我檢查 eng-123-order-export」。
 
@@ -198,7 +231,7 @@ openspec/changes/eng-123-order-export/
 | 檢查點 | 時機 | 你要看什麼 |
 | --- | --- | --- |
 | 1. 提案核准 | architect 完成後 | 範圍是否符合 issue、OpenAPI 欄位是否合理、tasks 拆分是否可平行 |
-| 2. 歸檔前 | integrator 檢查通過後 | PR diff、測試結果、handoff.md 中的風險項 |
+| 2. 歸檔前 | 程式碼審查通過、Osamu 收尾開 PR 後 | PR diff、測試結果、`review.md` 的 PR 備註（shadow 時逐條判定）、高風險檔案的 diff、handoff.md 中的風險項 |
 
 | 風險 | 徵兆 | 對策 |
 | --- | --- | --- |
@@ -206,7 +239,10 @@ openspec/changes/eng-123-order-export/
 | 前後端 API 不一致 | 前端串接失敗、欄位名對不上 | openapi.yaml 單一來源，integrator 比對兩份 |
 | Agent 回報不實 | 回報「測試全過」但實際失敗 | integrator 必須實際執行測試，不採信前一棒的摘要 |
 | token 與時間成本暴增 | 小 issue 也跑完整四棒 | 小 issue 走捷徑，只派單一開發 Agent |
-| 無限退回 | 同一問題來回修 | 退回上限 2 次，超過交給你 |
+| 無限退回 | 同一問題來回修 | 退回上限 2 次（Osamu 檢查與程式碼審查共用），超過交給你 |
+| 審查誤報造成來回修改 | Shiori 退回的項目你常常不認同 | 先跑 shadow mode；只有高嚴重度且高信心才退回，其餘寫進 PR 備註 |
+| 審查增加 token 成本 | 小改動也跑完整審查 | 小 issue 沒有 delta spec 時只跑 `/code-review`，不派 Shiori |
+| 同名 skill 覆蓋內建審查 | `/code-review` 失去 effort／`--fix`／`ultra` | 不建立名為 `code-review` 的 skill；Shiori 用另取名的 `/custom-review` |
 
 ## 常見問題
 
