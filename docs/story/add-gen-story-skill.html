@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SDP-102 gen-story skill 導覽</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* 版面：16:9 固定畫布（1600×900）由 JS 等比縮放；每頁＝一段對話＋一份實際程式碼或操作步驟。
+     單一亮色紙面（刻意不做深色版），沿用 MCP 簡報的配色與元件。 */
+  :root {
+    --paper: #fbf9f6;
+    --ink: #1c2230;
+    --ink-soft: #4a5263;
+    --muted: #7f8592;
+    --line: #e4e0d8;
+    --card: #ffffff;
+    --chip-bg: #efece6;
+    --accent: #d9506f;  --accent-soft: #fbe7ec;
+    --blue: #3667a6;    --blue-soft: #e5eef8;
+    --green: #2f8a63;   --green-soft: #e3f3eb;
+    --amber: #b7791f;   --amber-soft: #fbf0dc;
+    --violet: #6b56b8;  --violet-soft: #ece8f8;
+    --code-bg: #1f2430; --code-ink: #e6e6e6; --code-hl: rgba(246,193,119,.14); --code-dim: #7d8598;
+    --stage: #14171f;
+    --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Code", Consolas, "Noto Sans Mono CJK TC", monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { background: var(--stage); overflow: hidden; font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+  #deck {
+    position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px;
+    transform-origin: center center; background: var(--paper); overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  }
+  .slide { position: absolute; inset: 0; padding: 56px 88px 84px; display: none; flex-direction: column; font-size: 24px; line-height: 1.55; }
+  .slide.active { display: flex; animation: fade .22s ease-out; }
+  /* 防溢出：格狀／彈性排版的子元素一律可收縮，長字串（路徑、指令）一律可斷行，避免撐破外框 */
+  .slide * { min-width: 0; }
+  .slide :where(p, li, td, th, .bubble, .card, .chip, .cap, .look) { overflow-wrap: anywhere; }
+  @keyframes fade { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } }
+
+  .slide[data-chapter="1"] { --chapter: var(--accent); }
+  .slide[data-chapter="2"] { --chapter: var(--blue); }
+  .slide[data-chapter="3"] { --chapter: var(--green); }
+  .slide[data-chapter="4"] { --chapter: var(--amber); }
+  .slide[data-chapter="5"] { --chapter: var(--violet); }
+
+  .kicker { font-size: 18px; font-weight: 700; letter-spacing: .14em; color: var(--chapter, var(--accent)); margin-bottom: 6px; }
+  h1 { font-size: 84px; line-height: 1.15; font-weight: 900; text-wrap: balance; }
+  h2 { font-size: 44px; line-height: 1.25; font-weight: 900; margin-bottom: 18px; text-wrap: balance; }
+  h3 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .lead { font-size: 27px; color: var(--ink-soft); }
+  .small { font-size: 20px; color: var(--ink-soft); }
+  .tiny { font-size: 16px; color: var(--muted); }
+  code.i { font-family: var(--mono); font-size: .84em; background: var(--chip-bg); border-radius: 6px; padding: 1px 7px; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: safe center; }
+  .cols { display: grid; gap: 36px; align-items: start; min-height: 0; }
+  .cols > * { min-width: 0; }
+  .c-2 { grid-template-columns: 1fr 1fr; }
+  .c-talk { grid-template-columns: 520px 1fr; }
+  .c-talk-wide { grid-template-columns: 460px 1fr; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── 對話 ───────────────────────────────────────────── */
+  .chat { display: flex; flex-direction: column; gap: 12px; }
+  .say { display: grid; grid-template-columns: 46px 1fr; gap: 12px; align-items: start; }
+  .say .av { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 20px; color: #fff; background: var(--who); }
+  .say .bubble { background: var(--card); border: 1px solid var(--line); border-radius: 4px 16px 16px 16px; padding: 10px 16px 12px; font-size: 21px; line-height: 1.5; }
+  .say .bubble b.n { display: block; font-size: 15px; letter-spacing: .06em; color: var(--who); margin-bottom: 2px; }
+  .say.you .bubble { background: var(--chip-bg); }
+  .you   { --who: #59606f; }
+  .hyuse { --who: var(--accent); }
+  .chika { --who: var(--blue); }
+  .yuma  { --who: var(--green); }
+  .osamu { --who: var(--amber); }
+  .shiori { --who: var(--violet); }
+
+  /* ── 卡片與標籤 ─────────────────────────────────────── */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; }
+  .card p { font-size: 20px; color: var(--ink-soft); line-height: 1.5; }
+  .tone-blue { background: var(--blue-soft); border-color: #c6d8ee; }
+  .tone-green { background: var(--green-soft); border-color: #bfe1cf; }
+  .tone-amber { background: var(--amber-soft); border-color: #ecd6ad; }
+  .tone-accent { background: var(--accent-soft); border-color: #f1c3cf; }
+  .tag { display: inline-block; font-size: 15px; font-weight: 700; letter-spacing: .06em; padding: 2px 11px; border-radius: 999px; margin-bottom: 10px; background: var(--ink); color: #fff; }
+  .tag.blue { background: var(--blue); } .tag.green { background: var(--green); } .tag.amber { background: var(--amber); } .tag.accent { background: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-family: var(--mono); font-size: 16px; padding: 3px 10px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); color: var(--ink-soft); }
+  .chip.op { font-family: var(--font); font-size: 18px; background: var(--green-soft); border-color: #bfe1cf; color: var(--ink); }
+  ul.pts { list-style: none; display: grid; gap: 8px; }
+  ul.pts li { position: relative; padding-left: 24px; font-size: 20px; color: var(--ink-soft); line-height: 1.5; }
+  ul.pts li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 10px; height: 10px; border-radius: 3px; background: var(--chapter, var(--accent)); }
+
+  /* ── 程式碼 ─────────────────────────────────────────── */
+  .codebox { min-width: 0; display: flex; flex-direction: column; }
+  pre.code { font-family: var(--mono); font-size: 16px; line-height: 1.5; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; padding: 14px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* 過長的行折到下一行並縮排，維持在框內 */
+  pre.code .ln { display: block; padding: 0 22px 0 46px; text-indent: -24px; }
+  pre.code .ln.hl { background: var(--code-hl); box-shadow: inset 4px 0 0 #f6c177; }
+  pre.code .k { color: #ff8fa8; } pre.code .s { color: #a8e0a0; } pre.code .f { color: #8cc4ff; }
+  pre.code .c { color: #8a93a6; font-style: italic; } pre.code .n { color: #f6c177; } pre.code .el { color: var(--code-dim); }
+  .cap { font-family: var(--mono); font-size: 14px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+  .cap b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ── 流程方塊 ───────────────────────────────────────── */
+  .flow { display: flex; align-items: stretch; }
+  .flow .node { flex: 1; background: var(--card); border: 2px solid var(--ink); border-radius: 12px; padding: 12px 14px; text-align: center; font-size: 20px; font-weight: 700; line-height: 1.35; display: flex; flex-direction: column; justify-content: center; }
+  .flow .node small { display: block; font-size: 15px; font-weight: 400; color: var(--ink-soft); margin-top: 4px; }
+  .flow .node.a { border-color: var(--accent); background: var(--accent-soft); }
+  .flow .node.b { border-color: var(--blue); background: var(--blue-soft); }
+  .flow .node.g { border-color: var(--green); background: var(--green-soft); }
+  .flow .arrow { flex: 0 0 48px; align-self: center; height: 3px; background: var(--ink); position: relative; margin: 0 6px; }
+  .flow .arrow::after { content: ""; position: absolute; right: -2px; top: -7px; border-left: 13px solid var(--ink); border-top: 8.5px solid transparent; border-bottom: 8.5px solid transparent; }
+
+  /* ── 步驟 ───────────────────────────────────────────── */
+  ol.steps { list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  ol.steps li { counter-increment: s; position: relative; padding-left: 50px; font-size: 20px; line-height: 1.5; color: var(--ink-soft); }
+  ol.steps li b { color: var(--ink); }
+  ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--chapter, var(--accent)); color: #fff; font-weight: 900; font-size: 17px; display: flex; align-items: center; justify-content: center; }
+  .cmd { display: block; font-family: var(--mono); font-size: 15px; background: var(--code-bg); color: var(--code-ink); border-radius: 8px; padding: 7px 12px; margin-top: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .look { display: block; font-size: 17px; color: var(--green); margin-top: 3px; }
+  .look::before { content: "看到 → "; font-weight: 700; }
+
+  /* ── 表格 ───────────────────────────────────────────── */
+  table.t { width: 100%; border-collapse: collapse; font-size: 18px; line-height: 1.45; }
+  table.t th, table.t td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  table.t th { font-size: 15px; letter-spacing: .06em; color: var(--muted); border-bottom: 2px solid var(--ink); white-space: nowrap; }
+  table.t td:first-child { font-weight: 700; white-space: nowrap; }
+  table.t tr.pick td { background: var(--amber-soft); }
+
+  /* ── 操作矩陣示意（HTML 繪製，非截圖）──────────────── */
+  .matrix { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  .matrix .grp { font-weight: 700; font-size: 19px; margin-bottom: 4px; }
+  .mrow { display: grid; grid-template-columns: 170px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .mrow:last-child { border-bottom: 0; }
+  .cb { display: inline-flex; align-items: center; gap: 6px; font-size: 17px; margin: 2px 14px 2px 0; white-space: nowrap; }
+  .cb i { width: 18px; height: 18px; border-radius: 3px; border: 2px solid #6b7280; display: inline-block; position: relative; flex: none; }
+  .cb.on i { background: #1976d2; border-color: #1976d2; }
+  .cb.on i::after { content: ""; position: absolute; left: 4px; top: 0; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+  .cb.half i { background: #1976d2; border-color: #1976d2; }
+  .cb.half i::after { content: ""; position: absolute; left: 2px; right: 2px; top: 6px; height: 2.5px; background: #fff; }
+  .cb.off-dis i { border-color: var(--line); }
+  .cb.off-dis { color: var(--muted); }
+  .cb.head { font-weight: 700; font-size: 18px; }
+  .toast { margin-top: 12px; font-size: 16px; background: #e5f3fd; color: #014361; border-radius: 8px; padding: 8px 12px; }
+
+  /* ── 檔案樹 ─────────────────────────────────────────── */
+  .tree { font-family: var(--mono); font-size: 16px; line-height: 1.5; }
+  .tree .root { font-weight: 600; font-size: 18px; margin-bottom: 4px; }
+  .tree ul { list-style: none; margin-left: 9px; padding-left: 0; }
+  .tree li { position: relative; padding: 2px 0 2px 22px; border-left: 2px solid var(--line); }
+  .tree li:last-child { border-left-color: transparent; }
+  .tree li::before { content: ""; position: absolute; left: -2px; top: 0; width: 16px; height: 15px; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-bottom-left-radius: 6px; }
+  .tree .d { color: var(--blue); font-weight: 600; }
+  .tree .f { color: var(--ink); }
+  .tree em { font-style: normal; font-family: var(--font); font-size: 14px; color: var(--muted); margin-left: 10px; white-space: nowrap; }
+
+  /* ── 封面與人物 ─────────────────────────────────────── */
+  .cover { justify-content: center; background:
+      radial-gradient(1100px 560px at 108% -12%, #fbe1e8 0, transparent 60%),
+      radial-gradient(900px 500px at -10% 120%, #e2ecf8 0, transparent 60%), var(--paper); }
+  .cover .bar { width: 110px; height: 8px; border-radius: 4px; background: var(--accent); margin-bottom: 30px; }
+  .cover .meta { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .cast { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 16px; }
+  .cast .p { text-align: center; padding: 18px 12px; }
+  .cast .p .av { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #fff; background: var(--who); }
+  .cast .p h3 { margin: 0; font-size: 22px; }
+  .cast .p p { font-size: 16px; color: var(--ink-soft); line-height: 1.45; }
+  .route { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 14px; margin-top: 26px; }
+  .route .r { border-top: 5px solid var(--c); padding-top: 10px; }
+  .route .r b { display: block; font-size: 15px; color: var(--c); letter-spacing: .08em; }
+  .route .r span { font-size: 19px; font-weight: 700; }
+
+  /* ── 頁尾與控制 ─────────────────────────────────────── */
+  #footer { position: absolute; left: 88px; right: 88px; bottom: 28px; display: flex; align-items: center; gap: 18px; font-size: 15px; color: var(--muted); pointer-events: none; }
+  #progress { flex: 1; display: flex; gap: 5px; }
+  #progress i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
+  #progress i.done { background: var(--c, var(--ink)); }
+  #pageno { font-family: var(--mono); min-width: 64px; text-align: right; }
+  #chapter-name { min-width: 230px; }
+  #nav { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(6px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; z-index: 5; }
+  #nav button { font: 600 14px var(--font); color: var(--ink-soft); background: rgba(255,255,255,.85); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  #nav button:hover { background: var(--card); color: var(--ink); }
+  #nav button:focus-visible { outline: 2px solid #f6c177; outline-offset: 2px; }
+  #hint { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); color: #9aa0ab; font-size: 13px; opacity: .75; }
+</style>
+</head>
+<body>
+<div id="hint">← → 或空白鍵翻頁 · F 全螢幕</div>
+<div id="nav"><button type="button" id="prev" aria-label="上一頁">‹ 上一頁</button><button type="button" id="next" aria-label="下一頁">下一頁 ›</button></div>
+
+<div id="deck">
+
+<section class="slide cover" data-chapter="1" data-name="封面">
+  <div class="bar"></div>
+  <div class="kicker">SDP-102 · FEATURE</div>
+  <h1>把一次變更<br>講成一段對話</h1>
+  <p class="lead">gen-story skill 通用化：讓任何 OpenSpec 專案都能把一個變更做成對話劇本式的 HTML 導覽。</p>
+  <div class="meta">
+    <span class="chip">change: add-gen-story-skill</span>
+    <span class="chip">branch: feature/SDP-102-gen-story</span>
+    <span class="chip op">只讀不改 · 不 commit</span>
+  </div>
+</section>
+
+<section class="slide" data-chapter="1" data-name="登場人物">
+  <div class="kicker">登場人物</div>
+  <h2>誰來帶你看這次變更</h2>
+  <div class="body">
+    <div class="cast">
+      <div class="p you"><div class="av">鴨</div><h3>鴨子</h3><p>提案人。想把多 Agent 產出變得好讀。</p></div>
+      <div class="p hyuse"><div class="av">導</div><h3>導覽</h3><p>單一敘事者。帶你走過決策與程式。</p></div>
+    </div>
+    <div class="route">
+      <div class="r" style="--c:var(--blue)"><b>章節 2</b><span>問題與決策</span></div>
+      <div class="r" style="--c:var(--green)"><b>章節 3</b><span>三個檔案去耦合</span></div>
+      <div class="r" style="--c:var(--amber)"><b>章節 4</b><span>怎麼跑起來</span></div>
+      <div class="r" style="--c:var(--violet)"><b>章節 5</b><span>檢查與檔案地圖</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-chapter="2" data-name="問題與決策">
+  <div class="kicker">問題與決策</div>
+  <h2>為什麼要「通用版」</h2>
+  <div class="body">
+    <div class="cols c-talk">
+      <div class="chat">
+        <div class="say you"><div class="av">鴨</div><div class="bubble"><b class="n">鴨子</b>多 Agent 一次改一堆東西，我想用對話劇本被引導著看重點。</div></div>
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>你在 ignsw 已做過一版，但路徑、repo 名、分支、角色全寫死，只能自己用。</div></div>
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>這次搬進 skill_repo、去掉耦合，讓任何 OpenSpec 專案都能跑。</div></div>
+      </div>
+      <div class="stack">
+        <div class="card tone-blue"><span class="tag blue">關鍵決策</span>
+          <ul class="pts">
+            <li>變更目錄固定走 <code class="i">openspec/changes/&lt;id&gt;/</code> 與 archive</li>
+            <li>base 分支 git 自動偵測，不寫死 main／dev</li>
+            <li>材料分必備／選用，純 OpenSpec 專案也能跑</li>
+            <li>角色不強制五角，可用旁白</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-chapter="3" data-name="實作：版面檢查腳本">
+  <div class="kicker">實作 · 1/2</div>
+  <h2>playwright 從「某個 repo」改成「目前專案」</h2>
+  <div class="body">
+    <div class="cols c-talk-wide">
+      <div class="chat">
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>原版寫死前端 repo 的 node_modules，換專案就壞。</div></div>
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>改成預設找目前專案，留 <code class="i">PLAYWRIGHT_FROM</code> 可覆寫，找不到就明確報錯。</div></div>
+      </div>
+      <div class="codebox">
+        <pre class="code" data-lang="ts" data-hl="1,4">const playwrightRoot = process.env.PLAYWRIGHT_FROM ?? process.cwd();
+let chromium;
+try {
+  ({ chromium } = createRequire(join(playwrightRoot, "package.json"))("playwright"));
+} catch {
+  process.exit(2);
+}</pre>
+        <div class="cap"><b>.claude/skills/gen-story/scripts/check_layout.mjs</b> 17-24</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-chapter="3" data-name="實作：探索與材料">
+  <div class="kicker">實作 · 2/2</div>
+  <h2>單一 repo 的探索與分層材料</h2>
+  <div class="body">
+    <div class="cols c-2">
+      <div class="codebox">
+        <pre class="code" data-lang="py" data-hl="1,2">openspec/changes/&lt;change-id&gt;/
+openspec/changes/archive/*-&lt;change-id&gt;/</pre>
+        <div class="cap"><b>.claude/skills/gen-story/SKILL.md</b> 30-31</div>
+        <p class="tiny">依序找：先進行中的變更目錄，沒有再找歸檔。</p>
+      </div>
+      <div class="stack">
+        <div class="card tone-green"><span class="tag green">材料分層</span>
+          <ul class="pts">
+            <li><b>必備</b>：proposal／design／tasks</li>
+            <li><b>選用</b>：handoff／review／.linear／openapi，存在才讀</li>
+          </ul>
+        </div>
+        <div class="card"><p>模板 <code class="i">story-template.html</code> 本來就沒有專案字樣，原樣移植：保留 <code class="i">{{ISSUE-ID}}</code> 佔位、<code class="i">STORY:SLIDES</code> 插入點與角色樣式。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-chapter="4" data-name="安裝整合">
+  <div class="kicker">安裝整合</div>
+  <h2>一行安裝，自動進清單</h2>
+  <div class="body">
+    <div class="cols c-talk">
+      <div class="chat">
+        <div class="say you"><div class="av">鴨</div><div class="bubble"><b class="n">鴨子</b>要改安裝腳本嗎？</div></div>
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>不用。可選項由 repo 內容即時產生，放進目錄就被認得；沒有跨 skill 相依，install.deps 不必加。</div></div>
+        <div class="say hyuse"><div class="av">導</div><div class="bubble"><b class="n">導覽</b>只在 README 補一列說明。</div></div>
+      </div>
+      <div class="codebox">
+        <pre class="code" data-lang="json" data-hl="5">backend-processor
+custom-review
+draw-mermaid
+gen-html
+gen-story
+issue-architect
+…</pre>
+        <div class="cap"><b>sh install.sh --list</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-chapter="4" data-name="實際操作">
+  <div class="kicker">實際操作</div>
+  <h2>怎麼跑一份導覽</h2>
+  <div class="body">
+    <ol class="steps">
+      <li><b>產生</b>：在專案根目錄執行 <code class="i">/gen-story &lt;change-id&gt;</code><span class="look">docs/story/&lt;change-id&gt;.html 出現一份單檔投影片</span></li>
+      <li><b>開啟</b>：瀏覽器打開該 HTML，用 ← → 或空白鍵翻頁<span class="look">對話帶你看決策，程式碼標了路徑與行號</span></li>
+      <li><b>版面檢查</b>：<span class="cmd">PLAYWRIGHT_FROM=&lt;playwright-repo-root&gt; \
+node .claude/skills/gen-story/scripts/check_layout.mjs \
+  docs/story/&lt;change-id&gt;.html --shots out/shots</span><span class="look">N 頁版面檢查通過（exit 0）</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="slide" data-chapter="5" data-name="檢查結果與檔案地圖">
+  <div class="kicker">檢查結果與檔案地圖</div>
+  <h2>完成了什麼 · 檔案在哪</h2>
+  <div class="body">
+    <div class="cols c-2">
+      <div class="stack">
+        <div class="card tone-green"><span class="tag green">已完成</span>
+          <ul class="pts">
+            <li>移植 3 檔並去耦合，繁中註解</li>
+            <li>README 補列、install --list 已含 gen-story</li>
+            <li>本頁導覽即以新版 gen-story 產出並通過版面檢查</li>
+          </ul>
+        </div>
+        <div class="card tone-amber"><span class="tag amber">執行前置</span><p>版面檢查需 playwright；本機用 npx 快取版（PLAYWRIGHT_FROM）驗證。</p></div>
+      </div>
+      <div class="tree">
+        <div class="root">.claude/skills/gen-story/</div>
+        <ul>
+          <li><span class="f">SKILL.md</span><em>流程與規則</em></li>
+          <li><span class="d">assets/</span><ul><li><span class="f">story-template.html</span><em>投影片骨架</em></li></ul></li>
+          <li><span class="d">scripts/</span><ul><li><span class="f">check_layout.mjs</span><em>版面檢查</em></li></ul></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="footer"><span id="chapter-name"></span><div id="progress"></div><span id="pageno"></span></div>
+</div>
+
+<script>
+(function () {
+  // ── 語法上色：逐行處理，支援 py / ts / json；data-hl="3-5,8" 標示重點行 ──
+  var KW = {
+    py: "class def return if elif else for in not and or is None True False import from as with raise continue while lambda pass yield try except finally",
+    ts: "export const let var return if else for of in new type import from as typeof null true false undefined function",
+    json: "true false null"
+  };
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function paint(line, lang) {
+    if (line.trim() === "…") return '<span class="el">' + esc(line) + "</span>";
+    var kws = new RegExp("^(?:" + KW[lang].split(" ").join("|") + ")$");
+    var cm = lang === "py" ? "#.*$" : lang === "ts" ? "\\/\\/.*$" : "(?!)";
+    var re = new RegExp("(" + cm + ")|((?:[rf]?)\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`[^`]*`)|(@?[A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()|(\\b\\d+\\b)|([A-Za-z_][A-Za-z0-9_]*)", "g");
+    var out = "", last = 0, m;
+    while ((m = re.exec(line))) {
+      out += esc(line.slice(last, m.index));
+      if (m[1]) out += '<span class="c">' + esc(m[1]) + "</span>";
+      else if (m[2]) out += '<span class="s">' + esc(m[2]) + "</span>";
+      else if (m[3]) out += kws.test(m[3]) ? '<span class="k">' + esc(m[3]) + "</span>" : '<span class="f">' + esc(m[3]) + "</span>";
+      else if (m[4]) out += '<span class="n">' + m[4] + "</span>";
+      else out += kws.test(m[5]) ? '<span class="k">' + esc(m[5]) + "</span>" : esc(m[5]);
+      last = re.lastIndex;
+    }
+    return out + esc(line.slice(last));
+  }
+  function parseHl(spec) {
+    var set = {};
+    (spec || "").split(",").forEach(function (part) {
+      var r = part.split("-").map(Number);
+      if (!r[0]) return;
+      for (var i = r[0]; i <= (r[1] || r[0]); i++) set[i] = true;
+    });
+    return set;
+  }
+  document.querySelectorAll("pre.code").forEach(function (pre) {
+    var lang = pre.dataset.lang || "py", hl = parseHl(pre.dataset.hl);
+    pre.innerHTML = pre.textContent.replace(/\n$/, "").split("\n").map(function (line, i) {
+      return '<span class="ln' + (hl[i + 1] ? " hl" : "") + '">' + (paint(line, lang) || " ") + "</span>";
+    }).join("");
+  });
+
+  // ── 翻頁、縮放、頁尾 ──
+  var deck = document.getElementById("deck");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var colors = { 0: "var(--ink)", 1: "var(--accent)", 2: "var(--blue)", 3: "var(--green)", 4: "var(--amber)", 5: "var(--violet)" };
+  var progress = document.getElementById("progress");
+  slides.forEach(function (s) { var i = document.createElement("i"); i.style.setProperty("--c", colors[s.dataset.chapter] || "var(--ink)"); progress.appendChild(i); });
+  var bars = progress.children, cur = 0;
+
+  function fromHash() { var m = /^#s(\d+)$/.exec(location.hash); var n = m ? +m[1] - 1 : 0; return Math.min(Math.max(n, 0), slides.length - 1); }
+  function show(n) {
+    cur = Math.min(Math.max(n, 0), slides.length - 1);
+    slides.forEach(function (s, i) { s.classList.toggle("active", i === cur); });
+    for (var i = 0; i < bars.length; i++) bars[i].classList.toggle("done", i <= cur);
+    document.getElementById("pageno").textContent = (cur + 1) + " / " + slides.length;
+    document.getElementById("chapter-name").textContent = slides[cur].dataset.name || "";
+    if (location.hash !== "#s" + (cur + 1)) history.replaceState(null, "", "#s" + (cur + 1));
+  }
+  function fit() {
+    var root = getComputedStyle(document.documentElement);
+    var w = window.innerWidth, h = window.innerHeight - (parseFloat(root.paddingTop) || 0) - (parseFloat(root.paddingBottom) || 0);
+    deck.style.transform = "translate(-50%, -50%) scale(" + Math.min(w / 1600, h / 900) + ")";
+  }
+  document.addEventListener("keydown", function (e) {
+    if (["ArrowRight", "PageDown", " "].indexOf(e.key) >= 0) { e.preventDefault(); show(cur + 1); }
+    else if (["ArrowLeft", "PageUp"].indexOf(e.key) >= 0) { e.preventDefault(); show(cur - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key === "f" || e.key === "F") {
+      try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(function () {}); } catch (err) {}
+    }
+  });
+  document.getElementById("prev").addEventListener("click", function () { show(cur - 1); });
+  document.getElementById("next").addEventListener("click", function () { show(cur + 1); });
+  var x0 = null;
+  deck.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+  deck.addEventListener("touchend", function (e) { if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1)); x0 = null; });
+  window.addEventListener("hashchange", function () { show(fromHash()); });
+  window.addEventListener("resize", fit);
+  fit(); show(fromHash());
+})();
+</script>
+</body>
+</html>
