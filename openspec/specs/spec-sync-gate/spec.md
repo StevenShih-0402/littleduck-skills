@@ -78,7 +78,7 @@ An affected spec folder SHALL pass only if at least one of the rule's `spec_file
 
 ### Requirement: Gate runs during implementation and again before archiving
 
-The gate SHALL be checked when implementation finishes and again as the final gate before archiving; only the final gate offers an exemption. In the multi-agent workflow the developer skills check within each task and `issue-integrator` is the final gate: a failing target passes only with an exemption line in `handoff.md`, listed for the user to confirm at checkpoint 2; otherwise it is returned to the developer agent.
+The gate SHALL be checked when implementation finishes and again as the final gate before archiving; only the final gate offers an exemption. In the multi-agent workflow the developer skills check within each task and `issue-integrator` is the final gate: a failing target passes only with an exemption line in `handoff.md`, which the orchestrator asks the user to confirm right after the integrator check; otherwise it is returned to the developer agent.
 
 #### Scenario: Missing delta found during implementation
 
@@ -93,7 +93,7 @@ The gate SHALL be checked when implementation finishes and again as the final ga
 #### Scenario: Integrator finds an exempted target
 
 - **WHEN** the target was not updated but `handoff.md` has `- **規格免同步**：<target> — <reason>`
-- **THEN** the check passes and the exemption is listed in the report for checkpoint 2
+- **THEN** the check passes, the exemption is listed in the report, and the orchestrator asks the user to confirm it before the pre-PR review starts
 
 ### Requirement: User decides how to resolve a failed final gate
 

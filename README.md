@@ -11,13 +11,13 @@
   - `gen-story` — 把一個 OpenSpec 變更做成對話劇本式的單檔 HTML 導覽投影片（版面檢查腳本需要 playwright）
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
   - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
-  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、檢查／審查後收尾／歸檔棒，隨 `agent-team` 一起安裝
-  - `custom-review` — 多 Agent 流程的 reviewer（Shiori）：對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，並評定內建 `/code-review` 發現，隨 `agent-team` 一起安裝
+  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、整合（檢查與執行驗證／收尾開 PR／歸檔／模擬合併隊列並合併），隨 `agent-team` 一起安裝
+  - `custom-review` — 多 Agent 流程的 reviewer（Shiori）：PR 前對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，PR 中評定內建 `/code-review`、`/security-review` 的發現，隨 `agent-team` 一起安裝
 - `.claude/commands/` — `opsx` 等 slash 指令
 - `linear/` — Linear 回填模板（question / analyze / change）
 - `spec-sync/` — 規格同步閘門的設定檔格式與範例（專案放 `openspec/spec-sync.yaml` 才啟用）
 - `CLAUDE.md` — 跨專案通用的開發習慣
-- `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架（五個角色含審查員 Shiori、`/ship-issue` 含程式碼審查步驟、`review.md` 範本、寫入範圍限制 hook；只在選 `agent-team` 時安裝）
+- `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架（五個角色含審查員 Shiori；`/ship-issue` 從提案一路自動做到合併：PR 前兩項檢查、PR 中四項檢查（CI、`/code-review`、`/security-review`、按風險審批）、模擬合併隊列，只有高風險時停下等你回覆「合併」；`review.md` 範本、寫入範圍限制 hook；只在選 `agent-team` 時安裝）
 
 ## 安裝 / 更新到其他專案
 
@@ -102,6 +102,7 @@ skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它�
 例如 `openspec/handoff-template.md` 新增了「## 狀態」區塊，`backend-processor` 依賴它，舊骨架要先移除該檔再重跑才拿得到。
 又例如 `hyuse.md`、`yuma.md`、`osamu.md`、`ship-issue.md` 改為引用隨附的角色 skill 與 hook；用舊骨架建立的 team-hq 要先移除這幾個檔再重跑。
 加入審查員 Shiori 後，新增的骨架檔 `.claude/agents/shiori.md` 與 `openspec/review-template.md` 也是「不存在才建立」，`osamu.md`、`ship-issue.md` 則改成「檢查 → 程式碼審查 → 收尾」流程；已安裝的 team-hq 要取這些更新，同樣得先移除舊的 `osamu.md`、`ship-issue.md` 再重跑（`custom-review` skill 會自動覆寫更新）。
+**全自動流程（SDP-111）**：`/ship-issue` 拿掉了檢查點 1、2 與 shadow mode，改由 Osamu 歸檔後模擬合併隊列並合併 PR。已安裝的 team-hq 要先移除 `ship-issue.md`、`osamu.md`、`shiori.md`、`openspec/handoff-template.md`、`openspec/review-template.md` 再重跑，並手動更新 team-hq `CLAUDE.md`；完整步驟見 `docs/multi-agent-workflow.md`「從舊版流程升級」。新版 `issue-integrator` 搭舊版 `ship-issue.md` 會在歸檔前停下，不會誤合併。
 
 角色 skill（`issue-architect`、`issue-integrator`、`frontend-processor` 與其相依）則和其他 skill 一樣**每次重跑都覆寫更新**，請勿在 team-hq 直接修改。
 安裝後把 `CLAUDE.md` 與 agent 定義裡的 `<frontend-repo>`、`<backend-repo>` 等佔位換成實際路徑，完整說明見 `docs/multi-agent-workflow.md`。

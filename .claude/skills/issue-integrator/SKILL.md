@@ -1,17 +1,18 @@
 ---
 name: issue-integrator
-description: 多 Agent 流程最後一棒（integrator）。分三段：「檢查」實際跑前後端測試／lint／typecheck／migration、核對 tasks、契約與規格同步，通過後設 reviewing 並停，交主對話跑程式碼審查；「收尾」在審查通過後依功能重切 commit、以 --force-with-lease 推送並開前後端 PR（PR 內文附 review.md 的 PR 備註）；「歸檔」在 user 回覆歸檔後對兩端執行 /opsx:archive、追加歸檔 commit 並回寫 Linear。Use when the integrator agent is dispatched by /ship-issue for check, finish, or archive.
+description: 多 Agent 流程的 integrator。分四段：「檢查」實際跑前後端測試／lint／typecheck／migration 與執行驗證、核對 tasks、契約與規格同步，通過後設 reviewing 交主對話做 PR 前審查；「收尾」在審查通過後重切 commit、以 --force-with-lease 推送並開前後端 PR（附 review.md 的 PR 備註）；「歸檔」在 PR 中檢查通過後對兩端執行 /opsx:archive、追加歸檔 commit 並回寫 Linear；「合併」模擬合併隊列，rebase 到最新主幹、重跑檢查與 CI，兩端都綠才依後端→前端合併。Use when the integrator agent is dispatched by /ship-issue for check, finish, archive, or merge.
 ---
 
 # Skill: Issue Integrator
 
-多 Agent 流程的**最後一棒**（流程總覽見 team-hq 的 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`）。
+多 Agent 流程的**整合與發布**角色（流程總覽見 team-hq 的 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`）。
 
 本 skill 對應單人流程 `issue-processor` 的步驟 5 與 `issue-solver`，有幾個刻意的差異：
 
-- **順序相反**：單人流程是先歸檔再開 PR；這裡先開 PR，讓 user 在檢查點 2 看 PR diff，user 回覆「歸檔」後才歸檔並追加歸檔 commit。
-- **中間多一道程式碼審查**：「檢查」通過後不立刻重切、開 PR，而是設 `reviewing` 並停下，由主對話（`/ship-issue` 5.5）跑內建 `/code-review` 與派 Shiori；審查通過後才派本 skill 做「收尾」。重切延到審查之後，避免審查退回修改後又要重切一次。
+- **先開 PR、後歸檔**：單人流程是先歸檔再開 PR；這裡先開 PR 讓主對話跑 PR 中檢查（CI、`/code-review`、`/security-review`、風險審批），全部通過後才歸檔並追加歸檔 commit。
+- **中間有審查**：「檢查」通過後不立刻重切、開 PR，而是設 `reviewing` 並停下，由主對話派 Shiori 做 PR 前審查；通過後才派本 skill「收尾」。
 - **重切 commit**：開發 Agent 每完成一項任務就推送一筆 WIP commit；收尾時，由本 skill 把它們重切成依功能分組的 commit。
+- **合併也是這裡做**：歸檔後由本 skill 模擬合併隊列並合併 PR。
 
 以下「`issue-processor`」「`issue-solver`」指 team-hq `.claude/skills/` 下的同名 skill，Linear 模板在 team-hq 的 `linear/`。**做法照這兩個 skill 的對應步驟，本檔只寫差異。**
 
@@ -19,20 +20,22 @@ description: 多 Agent 流程最後一棒（integrator）。分三段：「檢�
 
 - change-id、前後端 worktree 路徑（由 `.linear.md` 的 `repos` 決定要看哪幾端）
 - 兩端的主幹分支（PR 的 base），例：後端 `main`、前端 `dev`
-- 這次是「**檢查**」、「**收尾**」還是「**歸檔**」；歸檔時必須附帶「user 已回覆歸檔」
+- 這次是「**檢查**」、「**收尾**」、「**歸檔**」還是「**合併**」
+  - 歸檔時必須附帶「PR 中檢查已通過」；變更判定為高風險時，還要附帶「user 已回覆合併」
+  - 合併時必須附帶兩端 PR 網址
 
-缺少任何一項就停下回報。prompt 指定的執行段不是這三者之一時，停下回報，不要自行猜。
+缺少任何一項就停下回報。prompt 指定的執行段不是這四者之一時，停下回報，不要自行猜。
 
 ## 邊界
 
 - 不改程式碼，也不改 `tasks.md`、`proposal.md`、`design.md`、`openapi.yaml`（寫入限制 hook 會擋 Write／Edit），**不用 Bash 改檔**。
-- 例外：B 段重切時的 `git reset --soft` 與 `git restore --staged`，兩者只動 index。
+- 例外：B 段重切時的 `git reset --soft` 與 `git restore --staged`（只動 index），以及 D 段的 `git rebase`／`git rebase --abort`。
 - 可以寫：兩端的 `handoff.md`、`.linear.md`，以及歸檔時同步的 `openspec/specs/**`。
 - **不採信前一棒的結果**，每一項都自己實際執行。
 
 ### 指令從哪裡來
 
-測試、lint、型別檢查、migration 的實際指令與執行環境，**一律以該端 repo 的 `CLAUDE.md` 與本 change 的 `design.md` 為準**。兩份都沒寫某項指令時，停下回報缺少哪一項，不要猜指令。
+測試、lint、型別檢查、migration、執行驗證的實際指令與執行環境，**一律以該端 repo 的 `CLAUDE.md` 與本 change 的 `design.md` 為準**。兩份都沒寫某項必要指令（測試、lint）時，停下回報缺少哪一項，不要猜指令。執行驗證沒寫則略過（見 A2）。
 
 ---
 
@@ -55,8 +58,19 @@ description: 多 Agent 流程最後一棒（integrator）。分三段：「檢�
 | 型別檢查 | 該端有型別檢查時執行 |
 | migration | 有 migration 時，先 migrate 到新版，再退回前一版，最後 migrate 回新版，確認正反向都能執行 |
 | 規格 | 在 worktree 根目錄執行 `openspec validate <change-id> --strict` 與 `openspec validate --specs` |
+| 執行驗證 | 見下 |
 
 需要的資料庫、快取等服務未啟動時，**停下來請 user 自己啟動**，不要代為啟動。
+
+**執行驗證**（PR 前「確保正常運行」）：讀該端 repo `CLAUDE.md` 的「## 執行驗證」段，以及本 change `design.md` 補充的觀察點。
+
+1. 沒有「## 執行驗證」段：不執行，在 `handoff.md` 與報告記「執行驗證：略過（repo CLAUDE.md 未設定）」，**不因此判為失敗**。
+2. 有設定時依序執行：
+   - 以背景方式執行**啟動指令**，記下 PID 或停止方式；
+   - 依**就緒檢查**等到服務就緒，超過該段寫的等待上限（沒寫就 60 秒）判為失敗；
+   - 逐一執行**觀察點**（指令＋預期結果，例：`curl -s -o /dev/null -w '%{http_code}' localhost:8000/health` 預期 `200`），記下實際結果；
+   - 不論成功或失敗，最後都執行**停止指令**（沒寫就結束記下的 PID），確認沒有殘留的程序。
+3. 任一觀察點不符預期 → 不通過，退回該端開發 Agent（A4），重現指令寫該觀察點。
 
 ### A3. 核對
 
@@ -65,10 +79,10 @@ description: 多 Agent 流程最後一棒（integrator）。分三段：「檢�
 - 兩端的 `.linear.md` 除了 `stage` 以外都一致。
 - 兩端 worktree 乾淨（`git status --porcelain` 為空），且本機分支與 `origin/<branch>` 一致（`git status -sb` 沒有 ahead 或 behind）。不符就停下回報，不自行 commit 或 push。
 - 破壞性變更有照 repo `CLAUDE.md`「API 相容性」的規定新舊版並存：舊端點保留，新增跳版號的端點。
-- 開發 Agent 沒有改 `proposal.md`：執行 `git log --format='%h %s' $(git merge-base HEAD origin/<base>)..HEAD -- openspec/changes/<change-id>/proposal.md`。訊息以 `wip(` 開頭、但不是 `提案核准` 的 commit，就表示開發 Agent 動過提案。主對話核准時的 commit、上一輪重切後的功能 commit 都不算。
+- 開發 Agent 沒有改 `proposal.md`：執行 `git log --format='%h %s' $(git merge-base HEAD origin/<base>)..HEAD -- openspec/changes/<change-id>/proposal.md`。訊息以 `wip(` 開頭、但不是 `wip(<ISSUE-ID>): 提案` 的 commit，就表示開發 Agent 動過提案。主對話提交提案的 commit、上一輪重切後的功能 commit 都不算。
 - **規格同步（最終閘門）**：該端 repo 有 `openspec/spec-sync.yaml` 時，依 `spec-sync/README.md` 的「判定」，以 `git diff --name-only $(git merge-base HEAD origin/<base>)` 收集路徑並換算出目標：
   - 通過的目標記下即可；`capability` 目標在報告註明「歸檔時由 sync 寫入主規格」。
-  - 不通過的目標：如果該端 `handoff.md` 有對應的免同步聲明（`- **規格免同步**：<目標> — <理由>`），就放行，並把聲明逐條列進報告，讓 user 在檢查點 2 確認；沒有聲明就**不通過**，退回該端的開發 Agent。
+  - 不通過的目標：如果該端 `handoff.md` 有對應的免同步聲明（`- **規格免同步**：<目標> — <理由>`），就放行，並把聲明逐條列進報告，**由主對話當下請 user 確認**；沒有聲明就**不通過**，退回該端的開發 Agent。
   - 規則設定錯誤（同時寫了兩種目標或兩種都沒寫）時判為不通過，退回 architect 並在報告點出。
   - 只檢查有沒有寫，不判斷內容是否正確，也不自行補寫規格。
   - 沒有 `spec-sync.yaml` 時，這一項不適用。
@@ -77,7 +91,7 @@ description: 多 Agent 流程最後一棒（integrator）。分三段：「檢�
 
 任一項不通過時：
 
-1. 在**出問題那一端**的 `handoff.md` 追加一節 integrator 紀錄，寫明：「退回：第 N 次」、退回對象（architect／backend／frontend 的 Agent 名稱）、原因、重現指令。N 是同一對象在 `handoff.md` 中既有的退回次數加一（**與程式碼審查的退回合併計算**）。
+1. 在**出問題那一端**的 `handoff.md` 追加一節 integrator 紀錄，寫明：「退回：第 N 次」、退回對象（architect／backend／frontend 的 Agent 名稱）、原因、重現指令。N 是同一對象在 `handoff.md` 中既有的退回次數加一（**與 PR 前審查、CI、PR 中評定的退回合併計算**）。
 2. 把該端狀態區塊的階段改回 `backend`／`frontend`（退回 architect 時改為 `proposal`）。「暫停原因」填「integrator 退回第 N 次」，「下一步」填要修的內容。
 3. 只 commit 該端的 `handoff.md`，訊息為 `wip(<ISSUE-ID>): integrator 退回第 N 次`，然後一般 `git push`。交棒時 worktree 要保持乾淨。
 4. 回報主對話要退回給誰。**N 會超過 2 時就不再退回**，改為回報「需 user 處理」，並摘要歷次退回原因。
@@ -88,48 +102,56 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
 
 檢查全部通過時，**不重切、不開 PR**（那是收尾段的事）：
 
-1. 更新兩端的狀態區塊：階段改為 `reviewing`，「最後完成」填「integrator 檢查」，「下一步」填「程式碼審查」。
-2. 追加一節「integrator（<Agent 名稱>）— 檢查通過」，內容包括：每項檢查的實際指令與結果、規格免同步聲明、風險。
+1. 更新兩端的狀態區塊：階段改為 `reviewing`，「最後完成」填「integrator 檢查」，「下一步」填「PR 前審查」。
+2. 追加一節「integrator（<Agent 名稱>）— 檢查通過」，內容包括：每項檢查的實際指令與結果、執行驗證結果（逐一列出觀察點，或「略過」）、規格免同步聲明、風險。
 3. 每一端只 commit 該端的 `handoff.md`，訊息 `docs(openspec): 記錄 <ISSUE-ID> 檢查結果`，一般 `git push`。
 
-回報主對話（主對話據此進行**程式碼審查**）：
+回報主對話（主對話據此進行**PR 前審查**）：
 
-- 每項檢查的指令與結果；
+- 每項檢查的指令與結果、執行驗證結果；
 - 兩端 `handoff.md` 中的風險項；
-- 規格免同步聲明：逐條列出目標與理由；沒有就寫「無」。
+- 規格免同步聲明：逐條列出目標、觸發路徑與理由；沒有就寫「無」。
 
 ---
 
-## B. 收尾（只在主對話傳入「收尾」時；程式碼審查已通過）
+## B. 收尾（只在主對話傳入「收尾」時；PR 前審查已通過）
 
 收尾前先確認每一端狀態區塊階段為 `reviewing`；不是就停下回報。每一端各自執行：
 
-1. `git fetch origin <base>`；`git status --porcelain` 必須為空（程式碼審查只動了變更目錄的 `review.md`、`handoff.md`，且已 commit）。若除 `handoff.md`、`review.md` 外還有變動，回報主對話「需重新檢查」。
-2. 記下 `OLD=$(git rev-parse HEAD)` 與 `BASE=$(git merge-base HEAD origin/<base>)`。`OLD` 先記著，第 7 步一起寫進 `handoff.md`。
-3. 執行 `git reset --soft $BASE`，再執行 `git restore --staged .`（只動 index，不動工作樹）。接著依功能分批 `git add <路徑>` 並 commit，切法照 `issue-solver` **步驟 4**（繁體中文 message、`Co-Authored-By` 署名行）。注意：
+1. `git fetch origin <base>`；`git status --porcelain` 必須為空（審查只動了變更目錄的 `review.md`、`handoff.md`，且已 commit）。若檢查之後除 `handoff.md`、`review.md` 外還有變動，回報主對話「需重新檢查」。
+2. 記下 `OLD=$(git rev-parse HEAD)`，並決定重切起點 `FROM`：
+   - 該端還沒有 PR（`gh pr view <branch>` 失敗）：`FROM=$(git merge-base HEAD origin/<base>)`，從分支起點重切全部 commit。
+   - PR 已存在：`FROM` 取 `handoff.md` 最後一節收尾紀錄的「收尾 HEAD」，**只重切它之後的 commit**。之前的 commit SHA 保持不變，PR 中審查才能用 `<上輪 SHA>..HEAD` 做增量審查。`FROM` 不是 `HEAD` 的祖先（`git merge-base --is-ancestor $FROM HEAD` 失敗）時停下回報。
+   - `FROM` 等於 `OLD`（沒有新 commit）時跳過第 3～5 步。
+3. 執行 `git reset --soft $FROM`，再執行 `git restore --staged .`（只動 index，不動工作樹）。接著依功能分批 `git add <路徑>` 並 commit，切法照 `issue-solver` **步驟 4**（繁體中文 message、`Co-Authored-By` 署名行）。注意：
    - 此時**還沒歸檔**，所以不含 `chore(openspec)` 歸檔那一筆；
    - 變更目錄本身（含 `review.md`）與實作放在同一批；
-   - 退回修正後再次收尾時，一樣從分支起點重切全部 commit。
+   - 退回修正後的重切（PR 已存在）以「修正內容」分組，例：`fix(<範圍>): 修正 PR 中審查指出的 …`。
 4. `git diff $OLD HEAD` 必須為空。不為空就 `git reset --soft $OLD` 還原，並停下回報。
 5. 執行 `git push --force-with-lease=<branch>:$OLD origin <branch>`。被拒絕就停下回報，**不得改用 `--force`**。
 6. 開 PR 照 `issue-solver` **步驟 6**；PR 已存在就沿用（force push 後內容會自動更新）。base 用主對話傳入的該端主幹。
-   - **PR 內文附上該端 `review.md` 最後一輪標為「PR 備註」的發現**（沒有就寫「本輪無 PR 備註」）。
+   - **PR 內文附上該端 `review.md` 標為「PR 備註」的發現**（沒有就寫「目前無 PR 備註」）；PR 已存在時用 `gh pr edit --body-file` 更新這一段。
    - 主 issue 的 magic word 只放在其中一端的 PR（優先放後端），另一端用純文字列出 issue 代號，避免兩個 PR 重複觸發。
    - 兩個 PR 的內文互相附上對方的連結。
-7. 更新兩端的狀態區塊：階段改為 `ready-to-archive`，「最後完成」填「integrator 收尾（開 PR）」，「下一步」填「等待 user 回覆歸檔」。
-8. 追加一節「integrator（<Agent 名稱>）— 收尾」，內容包括：重切前的 SHA `OLD`、重切後的 commit 清單、tree 比對結果、PR 連結、附進 PR 的 review.md 備註條數、風險。
+7. 更新兩端的狀態區塊：階段改為 `pr-checking`，「最後完成」填「integrator 收尾（開 PR）」，「下一步」填「PR 中檢查」。
+8. 追加一節「integrator（<Agent 名稱>）— 收尾」，內容包括：重切前的 SHA `OLD`、重切起點 `FROM`、重切後的 commit 清單、tree 比對結果、PR 連結、附進 PR 的 review.md 備註條數、風險，以及一行「**收尾 HEAD**：`<第 5 步推送後的 git rev-parse HEAD>`」。下次收尾以它為 `FROM`；本筆紀錄 commit 在它之後，會和之後的修正一起被重切。
 9. 以 `docs(openspec): 記錄 <ISSUE-ID> 收尾結果` commit，並一般 `git push`。
 
-回報主對話（主對話據此進行**檢查點 2**）：
+回報主對話（主對話據此進行**PR 中檢查**）：
 
-- 重切前的 SHA 與重切後的 commit 清單、tree 比對結果；
+- 重切前的 SHA、重切起點、重切後的 commit 清單、tree 比對結果；
 - 兩個 PR 連結；
-- `handoff.md` 中的風險項；
-- 規格免同步聲明：逐條列出目標與理由；沒有就寫「無」。
+- `handoff.md` 中的風險項。
 
 ---
 
-## C. 歸檔（只在 user 回覆「歸檔」後）
+## C. 歸檔（只在 prompt 寫明「PR 中檢查已通過」時）
+
+先確認前置條件，任一不成立就停下回報、不歸檔：
+
+- prompt 寫明「PR 中檢查已通過」；
+- 兩端 `review.md` 最後一輪的風險等級為「高」時，prompt 另外寫明「user 已回覆合併」；
+- 每一端狀態區塊階段為 `pr-checking` 或 `awaiting-approval`。
 
 每一端各自執行：
 
@@ -137,7 +159,7 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
    - 歸檔流程中需要選擇是否同步 spec 時，一律選「同步」；
    - 遇到無法自行判斷的 blocker 就停下回報。
 2. **驗證**：在 worktree 根目錄執行 `openspec validate --specs`，失敗就停下回報。
-3. **更新交接檔**：把 archive 目錄內 `handoff.md` 的狀態區塊階段改為 `archived`，`.linear.md` 的 `stage` 改為 `archived`。
+3. **更新交接檔**：把 archive 目錄內 `handoff.md` 的狀態區塊階段改為 `archived`（下一步「合併」），`.linear.md` 的 `stage` 改為 `archived`。
 4. **commit 與推送**：以 `chore(openspec): 歸檔 <change-id>（<ISSUE-ID>）` 為一筆 commit，一般 push 到同一條分支。
 
 兩端都完成後：
@@ -153,10 +175,55 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
 
 ---
 
+## D. 合併（模擬合併隊列；只在主對話傳入「合併」時）
+
+先確認前置條件，任一不成立就停下回報、不合併：
+
+- 每一端的 `openspec/changes/<change-id>/` 已不存在，且 `openspec/changes/archive/` 下有 `*-<change-id>`（已歸檔）；
+- 每一端的 worktree 乾淨，本機分支與 `origin/<branch>` 一致；
+- prompt 帶了兩端 PR 網址，且 `gh pr view <網址> --json state` 為 `OPEN`。
+
+合併方式取 team-hq `CLAUDE.md`「合併方式」（沒寫就用 `--merge`，保留重切後的功能 commit）；CI 等待上限取同一處（沒寫就 30 分鐘）。
+
+### D1. 排隊：兩端各自驗證
+
+每一端各自執行：
+
+1. `git fetch origin <base>`。`git merge-base --is-ancestor origin/<base> HEAD` 成立（主幹沒有前進）就跳到第 4 步。
+2. 記下 `OLD=$(git rev-parse HEAD)`，執行 `git rebase origin/<base>`。
+   - **衝突**：立刻 `git rebase --abort`，確認 `git rev-parse HEAD` 等於 `OLD`，停止整個 D 段，回報衝突的檔案（`git diff --name-only --diff-filter=U` 在 abort 前取得）。**兩端都不合併。**
+3. 重跑 A2 的測試、lint、型別檢查、migration 與執行驗證（有設定才跑）。任一失敗 → 執行 `git reset --hard $OLD` 還原到 rebase 前（只在本段允許，因為工作樹在 rebase 前是乾淨的），停止整個 D 段並回報失敗項目與重現指令。**不退回開發 Agent**（change 已歸檔，開發 Agent 找不到交接檔），交由 user 決定。
+   通過後執行 `git push --force-with-lease=<branch>:$OLD origin <branch>`，被拒絕就停下回報，不得改用 `--force`。
+4. 等 CI：用 `gh pr view <網址> --json statusCheckRollup` 確認有沒有 check（剛推送時等 30 秒再看一次，兩次都空才判定無 CI）。有 check 時執行 `timeout <上限> gh pr checks <網址> --watch --fail-fast`：`0` 通過；`124` 逾時、其他非 0 失敗，都停止整個 D 段並回報，不合併。
+
+### D2. 合併：後端 → 前端
+
+兩端都通過 D1 後才開始：
+
+1. 後端：`gh pr merge <後端 PR 網址> --merge`（或設定的合併方式），確認 `gh pr view --json state` 變成 `MERGED`。
+2. 前端：合併前再 `git fetch origin <前端 base>`。前端主幹在 D1 之後又前進時，對前端重跑一次 D1（衝突或失敗就停下，回報「後端已合併、前端未合併」）。通過後 `gh pr merge <前端 PR 網址> --merge`，確認 `MERGED`。
+3. 只動一端時，只做那一端。
+4. 不帶 `--admin`，不帶 `--delete-branch`，不刪 worktree。
+
+### D3. 同步 Linear
+
+合併完成後，用 `mcp__linear__get_issue` 讀主 issue 目前的狀態（由 Linear automation 依 PR 合併轉換）。`.linear.md` 的 `sub_issues` 不是 `-` 時，把每一張 sub-issue 的狀態改成和主 issue 相同（`mcp__linear__save_issue` 的 `state`）。主 issue 還沒轉換時，等 30 秒再讀一次；仍未轉換就在報告註明「主 issue 狀態未自動轉換，sub-issue 未同步」，不手動改主 issue。
+
+回報：
+
+- 兩端 rebase 與否、重跑檢查與 CI 結果；
+- 合併結果（PR 網址與 `MERGED`，或停在哪一步、原因）；
+- sub-issue 同步結果；
+- 提醒：worktree 與已合併的分支由 user 自行移除。
+
+---
+
 ## 護欄
 
-- 檢查段不重切、不開 PR、不歸檔；收尾段才重切與開 PR；沒有「user 已回覆歸檔」就不進入 C 段。
-- 只在 B 段以 `--force-with-lease=<branch>:$OLD` 推送重切結果，其他情況一律不 force push。
-- 不 merge PR、不改 PR 的 reviewer／label；對 Linear 只寫 `issue-processor`／`issue-solver` 允許的欄位。
-- 發現問題只退回，不自己修。
+- 檢查段不重切、不開 PR、不歸檔；收尾段才重切與開 PR；沒有「PR 中檢查已通過」（高風險時加上「user 已回覆合併」）就不進入 C 段；沒有歸檔就不進入 D 段。
+- 只在 B 段（重切）與 D 段（rebase）以帶預期值的 `--force-with-lease=<branch>:<SHA>` 推送，其他情況一律不 force push，也不得改用 `--force`。
+- `git reset --hard` 只允許在 D1 第 3 步還原到 rebase 前的 `OLD`。
+- **只在 D 段 merge PR**：前置條件都成立、兩端檢查與 CI 都綠才合併；禁止 `gh pr merge --admin`，禁止繞過失敗或逾時的檢查。不刪分支、不刪 worktree。
+- 不改 PR 的 reviewer／label；對 Linear 只寫 `issue-processor`／`issue-solver` 允許的欄位，以及 D3 的 sub-issue 狀態。
+- 發現問題只退回或回報，不自己修。
 - 不修改 `linear/*_template.md` 與 `issue-*` skill。

@@ -93,7 +93,7 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 
 1. 把 team-hq 的 `openspec/handoff-template.md` 複製進每一端的變更目錄。用 Read 加 Write 複製，不要用 Bash `cp`，因為寫入限制 hook 只看 Write／Edit。
    - 填上 change-id；
-   - 狀態區塊：階段 `proposal`、最後完成「提案」、下一步「等待檢查點 1 核准」、暫停原因「等待 user 核准提案」、更新者與時間；
+   - 狀態區塊：階段 `proposal`、最後完成「提案」、下一步「等待主對話提交提案」、暫停原因「無」、更新者與時間；
    - 追加第一節「architect（<Agent 名稱>）」。
 2. 每一端寫一份**內容相同**的 `.linear.md`，格式照 `issue-reader` **步驟 4**，另加 `repos:` 一行：
 
