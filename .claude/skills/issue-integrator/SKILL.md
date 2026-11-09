@@ -30,6 +30,7 @@ description: 多 Agent 流程的 integrator。分四段：「檢查」實際跑�
 
 - 不改程式碼，也不改 `tasks.md`、`proposal.md`、`design.md`、`openapi.yaml`（寫入限制 hook 會擋 Write／Edit），**不用 Bash 改檔**。
 - 例外：B 段重切時的 `git reset --soft` 與 `git restore --staged`（只動 index），以及 D 段的 `git rebase`／`git rebase --abort`。
+- 截圖觀察點的截圖指令會寫檔，但只寫到 worktree 外的暫存目錄，不算改檔；**不可把截圖寫進 worktree**。
 - 可以寫：兩端的 `handoff.md`、`.linear.md`，以及歸檔時同步的 `openspec/specs/**`。
 - **不採信前一棒的結果**，每一項都自己實際執行。
 
@@ -62,15 +63,42 @@ description: 多 Agent 流程的 integrator。分四段：「檢查」實際跑�
 
 需要的資料庫、快取等服務未啟動時，**停下來請 user 自己啟動**，不要代為啟動。
 
-**執行驗證**（PR 前「確保正常運行」）：讀該端 repo `CLAUDE.md` 的「## 執行驗證」段，以及本 change `design.md` 補充的觀察點。
+**執行驗證**（PR 前「確保正常運行」）：觀察點有兩個來源，兩者都要跑，報告時分開列：
 
-1. 沒有「## 執行驗證」段：不執行，在 `handoff.md` 與報告記「執行驗證：略過（repo CLAUDE.md 未設定）」，**不因此判為失敗**。
+- **repo 通用**：該端 repo `CLAUDE.md` 的「## 執行驗證」段，每次都跑；
+- **本次專屬**：本 change 該端 `design.md` 的「## 執行驗證觀察點」段（D 段時 change 已歸檔，改讀 `openspec/changes/archive/*-<change-id>/design.md`）。內容寫「無」就只跑 repo 通用的觀察點。
+
+1. repo `CLAUDE.md` 沒有「## 執行驗證」段：不執行，`design.md` 的觀察點也不跑（沒有啟動方式）。在 `handoff.md` 與報告記「執行驗證：略過（repo CLAUDE.md 未設定）」，**不因此判為失敗**。
 2. 有設定時依序執行：
    - 以背景方式執行**啟動指令**，記下 PID 或停止方式；
    - 依**就緒檢查**等到服務就緒，超過該段寫的等待上限（沒寫就 60 秒）判為失敗；
-   - 逐一執行**觀察點**（指令＋預期結果，例：`curl -s -o /dev/null -w '%{http_code}' localhost:8000/health` 預期 `200`），記下實際結果；
+   - 有截圖觀察點時，先用 `mktemp -d` 建暫存目錄（**必須在 worktree 外**，否則工作樹會變髒）；
+   - 逐一執行**觀察點**，記下實際結果。觀察點分兩種：
+     - **指令**：指令＋預期輸出，例：`curl -s -o /dev/null -w '%{http_code}' localhost:8000/health` 預期 `200`；
+     - **截圖**：截圖指令＋預期畫面，處置見下；
    - 不論成功或失敗，最後都執行**停止指令**（沒寫就結束記下的 PID），確認沒有殘留的程序。
-3. 任一觀察點不符預期 → 不通過，退回該端開發 Agent（A4），重現指令寫該觀察點。
+3. 任一觀察點不通過 → 退回該端開發 Agent（A4），重現步驟寫該觀察點的指令（截圖觀察點附截圖路徑）。
+
+**截圖觀察點**：截圖指令以 `{out}` 佔位輸出檔。把它換成 `<暫存目錄>/<backend|frontend>-<序號>.png` 後執行：
+
+| 結果 | 怎麼認 | 處置 |
+|------|--------|------|
+| 有產出 PNG | 指令成功、檔案存在 | 用 Read 開圖，對照預期畫面判定（見下表） |
+| 工具不可用 | 沒產出 PNG，且錯誤訊息含 `command not found`（exit 127）、`npx canceled due to missing packages`、`Executable doesn't exist` 或 `playwright install` 等「工具或瀏覽器沒裝」的訊息 | 該點記為「略過（工具不可用）」並附錯誤訊息，**不因此判為失敗** |
+| 產品連不上 | 沒產出 PNG，且錯誤訊息是 `net::ERR_` 開頭（例：`net::ERR_CONNECTION_REFUSED`）或導覽逾時 | 不通過 |
+| 其他失敗 | 沒產出 PNG，訊息無法歸類 | 視為「無法確定」，附錯誤訊息 |
+
+> exit code 不足以區分工具缺失和產品問題：實測 `npx -y playwright@<版本> screenshot` 在瀏覽器未安裝、連線被拒時都是 exit 1。一定要看錯誤訊息。
+
+看圖判定：
+
+| 判定 | 條件 | 處置 |
+|------|------|------|
+| 符合 | 畫面呈現預期畫面點名的元素與文字 | 通過 |
+| 明顯不符 | 空白頁、錯誤頁（含 404／500）、框架的錯誤覆蓋層、亂碼、預期畫面點名的元素不存在 | 不通過 |
+| 無法確定 | 畫面有內容，但無法從圖判斷是否符合（例：資料筆數看不清、元素被遮住） | **不判為失敗**；在 `handoff.md` 列為風險，附截圖路徑與看不清的地方，交給 PR 前審查參考 |
+
+只有「明顯不符」與「產品連不上」會擋流程。拿不準時判「無法確定」，不要判「明顯不符」，避免無謂退回占用退回次數。截圖留在暫存目錄、不刪除，路徑寫進 `handoff.md`。
 
 ### A3. 核對
 
@@ -103,13 +131,13 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
 檢查全部通過時，**不重切、不開 PR**（那是收尾段的事）：
 
 1. 更新兩端的狀態區塊：階段改為 `reviewing`，「最後完成」填「integrator 檢查」，「下一步」填「PR 前審查」。
-2. 追加一節「integrator（<Agent 名稱>）— 檢查通過」，內容包括：每項檢查的實際指令與結果、執行驗證結果（逐一列出觀察點，或「略過」）、規格免同步聲明、風險。
+2. 追加一節「integrator（<Agent 名稱>）— 檢查通過」，內容包括：每項檢查的實際指令與結果、執行驗證結果（repo 通用與本次專屬分開，逐一列出觀察點的結果；截圖觀察點附截圖路徑，略過的附原因；整段沒設定就寫「略過」）、截圖暫存目錄路徑、規格免同步聲明、風險（含判為「無法確定」的截圖觀察點）。
 3. 每一端只 commit 該端的 `handoff.md`，訊息 `docs(openspec): 記錄 <ISSUE-ID> 檢查結果`，一般 `git push`。
 
 回報主對話（主對話據此進行**PR 前審查**）：
 
-- 每項檢查的指令與結果、執行驗證結果；
-- 兩端 `handoff.md` 中的風險項；
+- 每項檢查的指令與結果、執行驗證結果（含截圖觀察點：通過／略過／無法確定各幾點）；
+- 兩端 `handoff.md` 中的風險項，包括判為「無法確定」的截圖觀察點與截圖路徑；
 - 規格免同步聲明：逐條列出目標、觸發路徑與理由；沒有就寫「無」。
 
 ---
@@ -192,7 +220,7 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
 1. `git fetch origin <base>`。`git merge-base --is-ancestor origin/<base> HEAD` 成立（主幹沒有前進）就跳到第 4 步。
 2. 記下 `OLD=$(git rev-parse HEAD)`，執行 `git rebase origin/<base>`。
    - **衝突**：立刻 `git rebase --abort`，確認 `git rev-parse HEAD` 等於 `OLD`，停止整個 D 段，回報衝突的檔案（`git diff --name-only --diff-filter=U` 在 abort 前取得）。**兩端都不合併。**
-3. 重跑 A2 的測試、lint、型別檢查、migration 與執行驗證（有設定才跑）。任一失敗 → 執行 `git reset --hard $OLD` 還原到 rebase 前（只在本段允許，因為工作樹在 rebase 前是乾淨的），停止整個 D 段並回報失敗項目與重現指令。**不退回開發 Agent**（change 已歸檔，開發 Agent 找不到交接檔），交由 user 決定。
+3. 重跑 A2 的測試、lint、型別檢查、migration 與執行驗證（有設定才跑；本次專屬觀察點改讀歸檔目錄的 `design.md`，截圖觀察點的判定同 A2）。任一失敗 → 執行 `git reset --hard $OLD` 還原到 rebase 前（只在本段允許，因為工作樹在 rebase 前是乾淨的），停止整個 D 段並回報失敗項目與重現指令。**不退回開發 Agent**（change 已歸檔，開發 Agent 找不到交接檔），交由 user 決定。
    通過後執行 `git push --force-with-lease=<branch>:$OLD origin <branch>`，被拒絕就停下回報，不得改用 `--force`。
 4. 等 CI：用 `gh pr view <網址> --json statusCheckRollup` 確認有沒有 check（剛推送時等 30 秒再看一次，兩次都空才判定無 CI）。有 check 時執行 `timeout <上限> gh pr checks <網址> --watch --fail-fast`：`0` 通過；`124` 逾時、其他非 0 失敗，都停止整個 D 段並回報，不合併。
 
@@ -211,7 +239,7 @@ ISSUE-ID 取 `.linear.md` 的 `primary_issue`。
 
 回報：
 
-- 兩端 rebase 與否、重跑檢查與 CI 結果；
+- 兩端 rebase 與否、重跑檢查（含執行驗證與截圖觀察點）與 CI 結果；
 - 合併結果（PR 網址與 `MERGED`，或停在哪一步、原因）；
 - sub-issue 同步結果；
 - 提醒：worktree 與已合併的分支由 user 自行移除。
