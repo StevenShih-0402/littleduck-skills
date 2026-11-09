@@ -1,5 +1,5 @@
 // .claude/skills/gen-story/scripts/check_layout.mjs
-// 逐頁檢查 gen-story 導覽投影片的版面，找出「文字超出外框」與「內容超出畫布」，有問題即以 exit 1 結束。
+// 逐頁檢查 gen-story 導覽投影片的版面（超框、超出畫布）與內容密度（缺少主視覺、對話或文字過多），有問題即以 exit 1 結束。
 //
 // 用法：node check_layout.mjs <story.html> [--shots <輸出目錄>]
 //   playwright 預設從目前專案的 node_modules 載入；設 PLAYWRIGHT_FROM=<repo 根目錄> 可改從他處載入。
@@ -9,10 +9,21 @@
 //   1. 文字的實際排版範圍必須落在每一個「有外框的祖先」之內（有背景色或邊框的區塊，例：卡片、對話泡泡、程式碼框、表格格子）。
 //   2. 不得出現需要捲動才看得到的內容（scrollWidth／scrollHeight 大於可視範圍）。
 //   3. 內容不得超出 16:9 畫布，也不得壓到頁尾進度列（畫布底部 64px）。
+//   以下為內容規則（以圖表為主），封面頁（section.slide.cover）不檢查：
+//   4. 缺少主視覺：頁面內沒有任何圖形元件（VISUAL_SELECTORS）。
+//   5. 對話過多：對話泡泡超過 MAX_BUBBLES 則。
+//   6. 文字過多：圖形元件以外的說明文字（去除空白後）超過 MAX_PROSE 字；
+//      標題、kicker、標籤、程式碼說明列與泡泡內的角色名不計入。
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+// 內容規則門檻；調整時 SKILL.md 的「內容規則」與「檢查版面」要同步改。
+const MAX_PROSE = 150;
+const MAX_BUBBLES = 3;
+const VISUAL_SELECTORS = [".flow", ".vs", ".lanes", ".branch", ".stats", "table.t", ".matrix", ".tree", ".codebox", "ol.steps", ".cast"];
+const PROSE_EXCLUDE = ["h1", "h2", ".kicker", ".tag", ".cap", ".bubble b.n"];
 
 const playwrightRoot = process.env.PLAYWRIGHT_FROM ?? process.cwd();
 let chromium;
@@ -117,6 +128,34 @@ for (let n = 1; n <= total; n++) {
     return out;
   });
   found.forEach((p) => problems.push({ slide: n, ...p }));
+
+  // 規則 4～6：內容密度（以圖表為主）
+  const content = await page.evaluate(({ maxProse, maxBubbles, visuals, exclude }) => {
+    const out = [];
+    const slide = document.querySelector(".slide.active");
+    if (slide.classList.contains("cover")) return out;
+    const visualSel = visuals.join(",");
+    if (!slide.querySelector(visualSel)) {
+      out.push({ rule: "缺少主視覺", where: "section.slide", px: "0 個圖形元件", text: slide.dataset.name || "" });
+    }
+    const bubbles = slide.querySelectorAll(".say .bubble").length;
+    if (bubbles > maxBubbles) {
+      out.push({ rule: "對話過多", where: ".chat", px: `${bubbles} 則（上限 ${maxBubbles}）`, text: slide.dataset.name || "" });
+    }
+    const skipSel = [visualSel, ...exclude, "script", "style", "aside"].join(",");
+    let prose = 0;
+    const walker = document.createTreeWalker(slide, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || parent.closest(skipSel)) continue;
+      prose += node.textContent.replace(/\s+/g, "").length;
+    }
+    if (prose > maxProse) {
+      out.push({ rule: "文字過多", where: "section.slide", px: `${prose} 字（上限 ${maxProse}）`, text: slide.dataset.name || "" });
+    }
+    return out;
+  }, { maxProse: MAX_PROSE, maxBubbles: MAX_BUBBLES, visuals: VISUAL_SELECTORS, exclude: PROSE_EXCLUDE });
+  content.forEach((p) => problems.push({ slide: n, ...p }));
   if (shotsDir) await page.screenshot({ path: `${shotsDir}/s${String(n).padStart(2, "0")}.png` });
 }
 await browser.close();
@@ -124,7 +163,7 @@ await browser.close();
 if (problems.length === 0) {
   console.log(`✅ ${total} 頁版面檢查通過`);
 } else {
-  for (const p of problems) console.log(`❌ 第 ${p.slide} 頁｜${p.rule}｜${p.where}｜${p.px}px｜${p.text}`);
+  for (const p of problems) console.log(`❌ 第 ${p.slide} 頁｜${p.rule}｜${p.where}｜${typeof p.px === "number" ? p.px + "px" : p.px}｜${p.text}`);
   console.log(`共 ${problems.length} 處問題`);
   process.exit(1);
 }
