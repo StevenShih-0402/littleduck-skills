@@ -122,6 +122,53 @@
   .flow .arrow { flex: 0 0 48px; align-self: center; height: 3px; background: var(--ink); position: relative; margin: 0 6px; }
   .flow .arrow::after { content: ""; position: absolute; right: -2px; top: -7px; border-left: 13px solid var(--ink); border-top: 8.5px solid transparent; border-bottom: 8.5px solid transparent; }
 
+  /* ── 前後對照 .vs：改動前（左）→ 改動後（右）────────── */
+  .vs { display: grid; grid-template-columns: 1fr 56px 1fr; align-items: stretch; }
+  .vs .side { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .vs .side > b { font-size: 15px; letter-spacing: .08em; }
+  .vs .side.before { border-style: dashed; color: var(--ink-soft); }
+  .vs .side.before > b { color: var(--muted); }
+  .vs .side.after { border-color: var(--green); background: var(--green-soft); }
+  .vs .side.after > b { color: var(--green); }
+  .vs .side p, .vs .side li { font-size: 19px; line-height: 1.45; }
+  .vs .side ul { list-style: none; display: grid; gap: 6px; }
+  .vs .side li::before { content: "· "; font-weight: 900; }
+  .vs .to { align-self: center; justify-self: center; width: 0; height: 0; border-left: 22px solid var(--ink); border-top: 15px solid transparent; border-bottom: 15px solid transparent; }
+
+  /* ── 泳道／時序 .lanes：每列一個角色，欄＝時間先後；.step 以 --at 指定第幾欄 ── */
+  .lanes { --cols: 4; display: grid; gap: 10px; }
+  .lane { display: grid; grid-template-columns: 140px 1fr; gap: 14px; align-items: center; }
+  .lane .who { font-weight: 900; font-size: 18px; color: #fff; background: var(--who, var(--ink)); border-radius: 10px; padding: 10px 12px; text-align: center; }
+  .lane .track { display: grid; grid-template-columns: repeat(var(--cols), 1fr); column-gap: 28px; align-items: center; min-height: 56px; border-bottom: 2px dashed var(--line); padding-bottom: 6px; }
+  .lane .step { grid-column: var(--at, auto); grid-row: 1; background: var(--card); border: 2px solid var(--who, var(--ink)); border-radius: 10px; padding: 6px 12px; font-size: 17px; line-height: 1.35; text-align: center; }
+  .lanes .time { display: grid; grid-template-columns: 140px 1fr; gap: 14px; font-size: 14px; color: var(--muted); }
+  .lanes .time span { position: relative; height: 18px; }
+  .lanes .time span::before { content: ""; position: absolute; left: 0; right: 10px; top: 8px; height: 2px; background: var(--muted); }
+  .lanes .time span::after { content: ""; position: absolute; right: 0; top: 3px; border-left: 11px solid var(--muted); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+
+  /* ── 分支決策 .branch：上方問題，下方各選項的結果 ───── */
+  .branch { display: flex; flex-direction: column; align-items: center; }
+  .branch .q { background: var(--amber-soft); border: 2px solid var(--amber); border-radius: 12px; padding: 10px 22px; font-size: 21px; font-weight: 700; text-align: center; }
+  .branch .stem { width: 3px; height: 20px; background: var(--ink); }
+  .branch .opts { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; }
+  .branch .opt { position: relative; display: flex; flex-direction: column; align-items: center; padding: 0 10px; }
+  .branch .opt::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--ink); }
+  .branch .opt:first-child::after { left: 50%; }
+  .branch .opt:last-child::after { right: 50%; }
+  .branch .opt::before { content: ""; width: 3px; height: 22px; background: var(--ink); }
+  .branch .opt .when { font-size: 15px; font-weight: 700; letter-spacing: .06em; color: var(--ink-soft); background: var(--chip-bg); border-radius: 999px; padding: 2px 12px; margin-bottom: 8px; }
+  .branch .opt .res { width: 100%; background: var(--card); border: 2px solid var(--ink); border-radius: 12px; padding: 10px 14px; text-align: center; font-size: 19px; font-weight: 700; line-height: 1.35; }
+  .branch .opt .res small { display: block; font-size: 15px; font-weight: 400; color: var(--ink-soft); margin-top: 4px; }
+  .branch .opt.ok .res { border-color: var(--green); background: var(--green-soft); }
+  .branch .opt.ng .res { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* ── 數字磁磚 .stats：有出處的數字（測試數、頁數…）── */
+  .stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-top: 5px solid var(--chapter, var(--accent)); border-radius: 12px; padding: 14px 18px; }
+  .stat .v { display: block; font-size: 52px; font-weight: 900; line-height: 1.1; color: var(--ink); }
+  .stat .v small { font-size: 22px; font-weight: 700; color: var(--ink-soft); margin-left: 4px; }
+  .stat .l { display: block; font-size: 17px; color: var(--ink-soft); margin-top: 4px; }
+
   /* ── 步驟 ───────────────────────────────────────────── */
   ol.steps { list-style: none; counter-reset: s; display: grid; gap: 12px; }
   ol.steps li { counter-increment: s; position: relative; padding-left: 50px; font-size: 20px; line-height: 1.5; color: var(--ink-soft); }
