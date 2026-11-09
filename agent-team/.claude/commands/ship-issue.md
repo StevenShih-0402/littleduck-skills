@@ -85,7 +85,7 @@ Hyuse 回傳後，若有「待確認問題」，就問 user，把答案再派給
 
 ## 4. PR 前 ①：確保正常運行 → osamu「檢查」
 
-派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**檢查**」。Osamu 會實際跑測試、lint、typecheck、migration 與 `openspec validate`，並依各端 `CLAUDE.md` 的「## 執行驗證」把產品跑起來觀察（沒設定就記錄略過）。
+派 `osamu`，帶入：change-id、兩端 worktree 路徑、兩端主幹分支、「**檢查**」。Osamu 會實際跑測試、lint、typecheck、migration 與 `openspec validate`，並依各端 `CLAUDE.md` 的「## 執行驗證」與 `design.md` 的「## 執行驗證觀察點」把產品跑起來觀察，含指令與截圖觀察點（沒設定就記錄略過）。
 
 - **退回**：Osamu 會回報退回對象與第 N 次（被退回那一端的狀態區塊已由 Osamu 改回並 push）。依「退回規則」處理。
 - **通過**：Osamu 已把各端狀態區塊改為 `reviewing`。

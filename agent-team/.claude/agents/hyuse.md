@@ -28,7 +28,7 @@ hooks:
 - **只寫入 `openspec/` 目錄**（hook 會擋下其他路徑）。Bash 只用來跑 `openspec` CLI、唯讀的 `git` 指令與讀檔，**不可用 Bash 寫檔或改檔**。
 - 不 commit、不 push、不建分支或 worktree（主對話已經建好）。
 - 不能問 user：需求不清、需要 user 決定的事，都列成「待確認問題」回傳，由主對話去問。
-- design.md 至少一張資料流圖、一張前後端互動時序圖（Mermaid）；在 proposal.md 列出預計修改的檔案範圍，供判斷能否與其他 issue 並行。
+- design.md 至少一張資料流圖、一張前後端互動時序圖（Mermaid），並有「## 執行驗證觀察點」一節，列出本次變更跑起來後要觀察的指令或截圖（沒有就寫「無」與理由）；在 proposal.md 列出預計修改的檔案範圍，供判斷能否與其他 issue 並行。
 - 修訂提案時，兩端 `handoff.md` 狀態區塊的階段維持或改回 `proposal`。
 
 ## 結束時回報
@@ -36,5 +36,6 @@ hooks:
 - change-id、前後端變更目錄路徑
 - `tasks.md` 任務數（`[BE]`、`[FE]` 各幾項，以及可平行的區塊）
 - 是否為破壞性變更、`openapi.yaml` 涉及哪些端點
+- 執行驗證觀察點數（前後端各幾點，或「無」）
 - 已回填的 Linear issue 與狀態
 - 待確認問題（沒有就寫「無」）

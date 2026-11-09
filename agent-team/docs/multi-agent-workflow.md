@@ -163,7 +163,7 @@ openspec/changes/eng-123-order-export/
 * [ ] 每個 repo 寫好 `CLAUDE.md`：技術棧、目錄結構、啟動 / 測試 / lint 指令、命名慣例
 * [ ] 確認 Linear MCP 已連線，能讀 issue、能改狀態與留言
 * [ ] 確認 `gh` CLI 已登入，能開 PR、留言與合併 PR（Osamu 合併段需要 merge 權限）
-* [ ] （可選）在前後端 repo 的 `CLAUDE.md` 加「## 執行驗證」段（啟動、就緒檢查、觀察點、停止；格式見 team-hq `CLAUDE.md`），Osamu 檢查時會把產品跑起來觀察；沒寫就略過
+* [ ] （可選）在前後端 repo 的 `CLAUDE.md` 加「## 執行驗證」段（啟動、就緒檢查、觀察點、停止；格式見 team-hq `CLAUDE.md`），Osamu 檢查時會把產品跑起來觀察；沒寫就略過。觀察點可以是指令，也可以是**截圖**（前端畫面）。用截圖時，要先在執行 Osamu 的環境裝好固定版本的截圖工具與瀏覽器（例：`npx playwright install chromium`）
 * [ ] 建立 `handoff.md` 範本，放進 OpenSpec 的變更樣板（範本已隨安裝放在 `openspec/handoff-template.md`；開頭的「## 狀態」區塊就地改值，開發 Agent 中斷後靠它接續。已用舊版骨架建立的 team-hq，安裝不會覆寫既有檔案，要取新版範本須先移除或改名舊的 `openspec/handoff-template.md` 再重跑 `install.sh agent-team`）
 
 完成標準：在任一 repo 手動開一個 worktree，能跑起服務與測試。
@@ -307,3 +307,11 @@ openspec/changes/eng-123-order-export/
 3. 把舊版改過的地方（repo 路徑佔位、模型、hook 路徑）合併回新檔。
 4. 手動更新 team-hq `CLAUDE.md`：「交接規則」、「層層把關」、「審查規則三分法」、「風險分級」、「合併設定」、「執行驗證」（可參考本 repo `agent-team/CLAUDE.md`）。
 5. 進行中的 issue 先用舊流程走完，再切換。
+
+### 截圖觀察點與 design.md 觀察點
+
+新版的 `issue-integrator` 支援截圖觀察點，`issue-architect` 會在 `design.md` 寫「## 執行驗證觀察點」。重跑 `install.sh agent-team` 會更新這兩個 skill，但 team-hq 的 `CLAUDE.md`、`.claude/agents/hyuse.md`、`.claude/agents/osamu.md` 是骨架檔，不會被覆寫：
+
+1. 手動把本 repo `agent-team/CLAUDE.md`「執行驗證」段的截圖格式與注意事項，合併進 team-hq `CLAUDE.md`。
+2. `hyuse.md`、`osamu.md` 的邊界與回報可以參考本 repo 的版本更新；不更新也不影響流程，因為步驟都寫在 skill 裡。
+3. 前後端 repo 想用截圖時，在各自 `CLAUDE.md` 的「## 執行驗證」加截圖觀察點。

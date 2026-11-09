@@ -48,6 +48,31 @@ In a check run the skill SHALL stop unless every affected side's stage is `integ
 - **WHEN** the repo's `CLAUDE.md` gives no start command for run verification
 - **THEN** the skill records run verification as skipped in `handoff.md` and the report, and does not fail the check for that reason
 
+#### Scenario: Change-specific observation points in design.md
+
+- **WHEN** run verification is configured and the side's `design.md` lists observation points for this change
+- **THEN** the skill checks those points in the same run as the repo's own points, and lists each one's result separately in `handoff.md` and the report
+
+#### Scenario: Screenshot observation point matches
+
+- **WHEN** an observation point gives a screenshot command and an expected screen, and the screenshot taken while the product runs clearly shows the expected screen
+- **THEN** the point passes, and the screenshot is saved outside the worktree so it is never committed
+
+#### Scenario: Screenshot clearly does not match
+
+- **WHEN** the screenshot shows a blank page, an error page, or lacks an element the expected screen names
+- **THEN** the check fails and returns to that side's developer agent, with the screenshot command as the reproduction step
+
+#### Scenario: Screenshot result uncertain
+
+- **WHEN** the skill cannot tell from the screenshot whether the expected screen is shown
+- **THEN** the point does not fail the check, and the skill records it as a risk in `handoff.md` with the screenshot path so the pre-PR review can see it
+
+#### Scenario: Screenshot tool unavailable
+
+- **WHEN** the screenshot command is not installed or its browser cannot start in this environment
+- **THEN** the skill records that point as skipped with the error message, and does not fail the check for that reason
+
 ### Requirement: Consistency checks
 
 The check SHALL verify that both `tasks.md` have no unchecked items except annotated env-blocked ones, both `openapi.yaml` files are identical and match the implemented routes, `.linear.md` files agree apart from `stage`, both worktrees are clean and level with their remote branch, breaking changes keep the old endpoint, `proposal.md` was not changed by developers, and the spec sync gate passes as described in `spec-sync-gate`.

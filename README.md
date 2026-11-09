@@ -11,7 +11,7 @@
   - `gen-story` — 把一個 OpenSpec 變更做成對話劇本式的單檔 HTML 導覽投影片（版面檢查腳本需要 playwright）
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
   - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
-  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案、前端實作（附編輯後 lint hook）、整合（檢查與執行驗證／收尾開 PR／歸檔／模擬合併隊列並合併），隨 `agent-team` 一起安裝
+  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案（含執行驗證觀察點）、前端實作（附編輯後 lint hook）、整合（檢查與執行驗證含截圖觀察點／收尾開 PR／歸檔／模擬合併隊列並合併），隨 `agent-team` 一起安裝
   - `custom-review` — 多 Agent 流程的 reviewer（Shiori）：PR 前對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，PR 中評定內建 `/code-review`、`/security-review` 的發現，隨 `agent-team` 一起安裝
 - `.claude/commands/` — `opsx` 等 slash 指令
 - `linear/` — Linear 回填模板（question / analyze / change）

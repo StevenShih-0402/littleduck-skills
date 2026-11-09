@@ -73,6 +73,19 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 
 以後端那份為主；前端 `design.md` 以連結指向後端的圖，只補前端特有的內容（頁面跳轉、狀態、路由守衛）。
 
+### design.md：執行驗證觀察點
+
+每一端的 `design.md` 都要有一節 `## 執行驗證觀察點`，列出**跑起產品後能證明本次變更有效**的觀察點。Osamu「檢查」時會跟 repo `CLAUDE.md`「## 執行驗證」的通用觀察點一起跑（格式見 team-hq `CLAUDE.md`「執行驗證」）。
+
+- 格式同 repo `CLAUDE.md` 的觀察點，兩種擇一：
+  - **指令**：`<指令>` → `<預期輸出>`，後端以這種為主，例：`curl -s localhost:8000/api/v2/orders/export | jq '.data | length'` → `大於 0`；
+  - **截圖**：`<截圖指令，輸出寫 {out}>` → `<預期畫面>`，前端以這種為主。截圖指令沿用 repo `CLAUDE.md` 既有的寫法，只換網址。
+- 只寫**本次變更**的行為，不重複 repo 的通用觀察點（例：`/health`）。
+- 預期畫面要**點名具體元素**（標題文字、欄位、按鈕、筆數），不要寫「頁面正常顯示」。Osamu 看圖時只有點名的元素能當判準。
+- 啟動方式、port、登入狀態以 repo `CLAUDE.md` 為準，不要自創；需要登入才看得到的頁面，repo 沒提供帶登入的截圖方式時改用指令觀察點，或列成待確認問題。
+- 沒有能在執行時觀察的行為（例：只動文件、純重構）：寫「無」並附理由。
+- repo `CLAUDE.md` 沒有「## 執行驗證」段：照樣寫觀察點，並在該節註明「repo 尚未設定執行驗證，Osamu 檢查時會略過」，同時列進**待確認問題**，讓主對話提醒 user 補設定。
+
 ### openapi.yaml：API 契約草稿
 
 - 放在**後端**變更目錄 `openspec/changes/<change-id>/openapi.yaml`，格式為 OpenAPI 3，只寫本次新增或變動的端點（路徑、method、request／response schema、錯誤碼）。
@@ -134,6 +147,7 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 - change-id、前後端變更目錄路徑
 - `tasks.md` 任務數（`[BE]`、`[FE]` 各幾項，以及可平行的區塊）
 - 是否為破壞性變更、`openapi.yaml` 涉及哪些端點
+- 執行驗證觀察點數（前後端各幾點，或「無」與理由）；repo 尚未設定執行驗證的一端要註明
 - 命中哪些規格同步規則（沒有 `spec-sync.yaml` 就寫「不適用」）
 - 已回填的 Linear issue 與狀態
 - 待確認問題（沒有就寫「無」）
