@@ -164,6 +164,7 @@ openspec/changes/eng-123-order-export/
 * [ ] 確認 Linear MCP 已連線，能讀 issue、能改狀態與留言
 * [ ] 確認 `gh` CLI 已登入，能開 PR、留言與合併 PR（Osamu 合併段需要 merge 權限）
 * [ ] （可選）在前後端 repo 的 `CLAUDE.md` 加「## 執行驗證」段（啟動、就緒檢查、觀察點、停止；格式見 team-hq `CLAUDE.md`），Osamu 檢查時會把產品跑起來觀察；沒寫就略過。觀察點可以是指令，也可以是**截圖**（前端畫面）。用截圖時，要先在執行 Osamu 的環境裝好固定版本的截圖工具與瀏覽器（例：`npx playwright install chromium`）
+* [ ] （可選）在前後端 repo 的 `CLAUDE.md` 加「## 變異測試」段（變異測試指令與通過閾值；格式見 team-hq `CLAUDE.md`「變異測試」），Osamu 檢查時會對 Hyuse 在 `design.md`「## 變異測試目標」標示的關鍵模組跑變異測試，驗證測試真的能抓到 bug；**沒寫就略過、不擋流程**。只跑關鍵模組，不做全專案
 * [ ] 建立 `handoff.md` 範本，放進 OpenSpec 的變更樣板（範本已隨安裝放在 `openspec/handoff-template.md`；開頭的「## 狀態」區塊就地改值，開發 Agent 中斷後靠它接續。已用舊版骨架建立的 team-hq，安裝不會覆寫既有檔案，要取新版範本須先移除或改名舊的 `openspec/handoff-template.md` 再重跑 `install.sh agent-team`）
 
 完成標準：在任一 repo 手動開一個 worktree，能跑起服務與測試。

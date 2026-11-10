@@ -86,6 +86,15 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 - 沒有能在執行時觀察的行為（例：只動文件、純重構）：寫「無」並附理由。
 - repo `CLAUDE.md` 沒有「## 執行驗證」段：照樣寫觀察點，並在該節註明「repo 尚未設定執行驗證，Osamu 檢查時會略過」，同時列進**待確認問題**，讓主對話提醒 user 補設定。
 
+### design.md：變異測試目標
+
+每一端的 `design.md` 都要有一節 `## 變異測試目標`，標出**本次變更**中需要驗證測試有效性的關鍵模組／路徑（例：權限檢查、狀態機等關鍵邏輯）。Osamu「檢查」時會對這些目標跑變異測試，確認 Agent 產出的測試真的能在程式出錯時失敗。
+
+- **只標本次變更碰到的關鍵邏輯**，不要列全專案；criticality 由你這次的系統分析判定。
+- 每個目標寫出模組或路徑；對應實作該目標的 `tasks.md` 任務要在 §tasks.md 點名（見下）。
+- **不要在此選變異測試工具、指令或通過閾值**——那些由各 repo 的 `CLAUDE.md` 提供，Osamu 檢查時取用；此節只寫「要驗哪些模組」。
+- 本次沒有權限、狀態機等關鍵邏輯時，這節寫「無」並附理由（Osamu 會據此記為不適用、不跑）。
+
 ### openapi.yaml：API 契約草稿
 
 - 放在**後端**變更目錄 `openspec/changes/<change-id>/openapi.yaml`，格式為 OpenAPI 3，只寫本次新增或變動的端點（路徑、method、request／response schema、錯誤碼）。
@@ -100,6 +109,7 @@ openspec instructions <artifact> --change <change-id> --json   # 取各 artifact
 - 每項任務寫明**驗證方式**（要跑的測試或檢查）。開發 Agent 中斷後重來時，會重跑最後一項已勾任務的驗證。
 - 標出可平行的區塊，例：`> 可平行：前端 3.x 可依 openapi.yaml 以 mock 先行，不必等後端 2.x`。
 - 有 migration 的任務，要把 model 與 migration 寫在同一項，不要拆開。
+- 實作 `## 變異測試目標` 所列關鍵模組的任務，要在該項**點名為變異測試目標**（例：`- [ ] 2.3 [BE] 實作訂單狀態機轉換（變異測試目標：orders/state_machine.py）`），讓 Osamu 檢查時對得上要跑變異測試的模組。
 - 測試、lint、版本號 bump 的規範依各端的 `CLAUDE.md`；前端的完成定義見 `/frontend-processor`。
 
 ## 步驟 4：handoff.md 與 .linear.md
