@@ -126,3 +126,13 @@ source /path/to/littleduck-skills/completions/install.bash
 **可重複執行**：再跑一次即就地更新到最新版本，不會產生重複或巢狀副本。缺少的目標目錄會自動建立。
 
 > 注意：安裝會以本 repo 的版本覆寫目標專案中同名的 skill、指令與模板（`CLAUDE.md` 與 agent-team 骨架除外），請勿在目標專案直接修改這些檔案。
+
+## Remote Control（手機監看）
+
+想在手機上監看 Claude Code 的進度、派新任務給本機時：
+
+```bash
+.claude/scripts/remote-control.sh start   # 在背景 tmux 啟動 server；status／stop／attach 查詢、停止、接回
+```
+
+首次啟動步驟、手機端操作與限制見 [docs/remote-control.md](docs/remote-control.md)。
