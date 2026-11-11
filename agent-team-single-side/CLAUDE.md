@@ -50,7 +50,7 @@
 | `/ship-issue <id>` | 串起四個角色的總指揮：從提案一路自動做到合併，只在停下條件成立時問 user | `.claude/commands/ship-issue.md` | — | — |
 
 - 定義檔只寫身分、工具、模型、邊界與交接規則；**調整流程步驟只改 skill**。
-- **Agent 名稱可以改**：改檔名、frontmatter 的 `name` 與本表即可。角色 skill 不寫 Agent 名稱，hook 的參數是角色不是名稱，所以重跑 installer 後不必再改 `.claude/skills/`。**改名後重跑 installer 會再建立範本名稱的 Agent 定義**（同名檔不存在就建立），重跑後要刪掉多出來的範本名稱定義檔，否則會有兩套 Agent。
+- **Agent 名稱可以改**：改檔名、frontmatter 的 `name` 與本表即可。角色 skill 不寫 Agent 名稱，hook 的參數是角色不是名稱，所以重跑 installer 後不必再改 `.claude/skills/`。**改名後可以放心重跑 installer**：`.claude/agents/` 已有任何 Agent 定義（不論檔名）時，installer 不會建立範本名稱的 Agent 定義，並在輸出逐檔說明略過原因；只有 `.claude/agents/` 不存在或沒有 `*.md` 時才建立全部範本。
 - 重跑 `install.sh agent-team-single-side` 會更新 `.claude/skills/` 的角色 skill；本檔、Agent 定義、`ship-issue.md`、hook、範本已存在時一律略過。
 - **內建 `/code-review` 不要建立同名 skill**：同名的專案或個人 skill 會整個取代內建審查，失去 effort 調整、`--fix`、`ultra`。reviewer 用的是另取名的 `/custom-review`。
 - subagent 不能再派 subagent，也不能用 AskUserQuestion，所以要問 user 的決定都在主對話（`/ship-issue`）先問完再交棒。

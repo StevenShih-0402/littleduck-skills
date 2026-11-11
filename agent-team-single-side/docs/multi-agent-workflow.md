@@ -95,7 +95,7 @@ flowchart LR
 分工原則：
 
 - **Agent 是「誰」，skill 是「怎麼做」。** 流程步驟寫在 skill，定義檔只寫身分、邊界與交接規則。改流程只改 skill。
-- **Agent 名稱可以改。** 改定義檔檔名、frontmatter 的 `name`、`CLAUDE.md` 的 Agent 表與 `ship-issue.md` 裡的名稱即可；角色 skill 不寫 Agent 名稱，hook 參數是角色，重跑 installer 後不必再改 `.claude/skills/`。**改名後重跑 installer 會再建立範本名稱的 Agent 定義**（同名檔不存在就建立），重跑後要刪掉多出來的範本名稱定義檔，否則會有兩套 Agent。「端」為 `backend` 時，建議把開發 Agent 改成後端角色的名字，並把它的 lint hook 改成 `backend-processor` 的。
+- **Agent 名稱可以改。** 改定義檔檔名、frontmatter 的 `name`、`CLAUDE.md` 的 Agent 表與 `ship-issue.md` 裡的名稱即可；角色 skill 不寫 Agent 名稱，hook 參數是角色，重跑 installer 後不必再改 `.claude/skills/`。**改名後可以放心重跑 installer**：`.claude/agents/` 已有任何 Agent 定義（不論檔名）時，installer 不會建立範本名稱的 Agent 定義，並在輸出逐檔說明略過原因；只有 `.claude/agents/` 不存在或沒有 `*.md` 時才建立全部範本。「端」為 `backend` 時，建議把開發 Agent 改成後端角色的名字，並把它的 lint hook 改成 `backend-processor` 的。
 - **權限要真的限制。** architect 不改程式碼；integrator 不修 bug，發現問題就退回；reviewer 只有唯讀工具。
 - **Osamu 管「有沒有過」，Shiori 管「該測的有沒有測」。** 開發 Agent 同時寫程式和測試，理解有偏差時兩者會一起錯、測試照樣通過，這是 Shiori 要補的缺口。
 - **審查規則依性質分三處放**（見 `CLAUDE.md`「審查規則三分法」）。

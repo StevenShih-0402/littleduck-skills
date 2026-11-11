@@ -111,9 +111,9 @@ skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它�
 | 一個 repo 只有一端（例：純 API、純前端、桌面程式、CLI） | `agent-team-single-side` | 一個，依「端」走 `backend-processor` 或 `frontend-processor` |
 
 - 安裝後在專案 `CLAUDE.md` 填好「## agent-team 設定」（結構、主幹、worktree 根目錄、子目錄或端）與「## 檢查指令」；角色 skill、`/ship-issue`、寫入範圍 hook 都讀這一段，不寫死目錄。專案已有 `CLAUDE.md` 時 installer 不覆寫，要手動把 kit 的段落合併進去。
-- 骨架是「不存在才建立」：已存在的檔案（Agent 定義、`ship-issue.md`、hook、範本、`CLAUDE.md`）一律略過，不覆寫。本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑，或參考 kit 目錄手動合併。
+- 骨架是「不存在才建立」：已存在的檔案（Agent 定義、`ship-issue.md`、hook、範本、`CLAUDE.md`）一律略過，不覆寫；Agent 定義另以整組判斷，`.claude/agents/` 已有任何 Agent 定義就不建立範本名稱的 Agent。本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑，或參考 kit 目錄手動合併。
 - 角色 skill（`issue-architect`、`issue-integrator`、`backend-processor`、`frontend-processor`、`custom-review` 與其相依）和其他 skill 一樣**每次重跑都覆寫更新**，請勿在專案內直接修改。
-- **Agent 名稱可以改**（改定義檔檔名、`name`、`CLAUDE.md` 的 Agent 表與 `ship-issue.md`）。角色 skill 只用角色稱呼、不寫 Agent 名稱，hook 的參數也是角色（`architect`、`integrator`、`backend`、`frontend`），所以重跑 installer 後不必再改 `.claude/skills/`。**改名後重跑 installer 會再建立範本名稱的 Agent 定義**（同名檔不存在就建立），重跑後要刪掉多出來的範本名稱定義檔，否則會有兩套 Agent。
+- **Agent 名稱可以改**（改定義檔檔名、`name`、`CLAUDE.md` 的 Agent 表與 `ship-issue.md`）。角色 skill 只用角色稱呼、不寫 Agent 名稱，hook 的參數也是角色（`architect`、`integrator`、`backend`、`frontend`），所以重跑 installer 後不必再改 `.claude/skills/`。**改名後可以放心重跑 installer**：`.claude/agents/` 已有任何 Agent 定義（不論檔名）時，installer 不會建立範本名稱的 Agent 定義，並在輸出逐檔說明略過原因；只有 `.claude/agents/` 不存在或沒有 `*.md` 時才建立全部範本。
 - 完整說明見 kit 內的 `docs/multi-agent-workflow.md`。
 
 #### 從舊版 agent-team 遷移
