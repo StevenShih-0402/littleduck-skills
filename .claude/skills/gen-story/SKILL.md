@@ -61,7 +61,7 @@ description: 把一個 OpenSpec 變更做成對話劇本式的單檔 HTML 導覽
 
 小變更以 6～8 頁為目標；大變更不超過 20 頁。
 
-**角色依專案而定**：模板內建的角色樣式 class 沿用多 Agent 團隊的 5 個角色（`hyuse`／`chika`／`yuma`／`osamu`／`shiori`）與使用者旁白 `you`。若專案不是這種多 Agent 編制，就用**旁白**（`you`）或一個單一敘事者帶讀即可，不必硬湊 5 個角色；也可以依專案自己的角色命名，對應到模板既有的樣式 class。
+**角色依專案而定**：模板內建的角色樣式 class 對應多 Agent 團隊的 5 個角色（`architect`／`backend`／`frontend`／`integrator`／`reviewer`）與使用者旁白 `you`。class 用角色名而非 Agent 名稱，專案改 Agent 名稱時不必改模板；對話泡泡裡顯示的名字（`.n`）照專案的 Agent 名稱寫。若專案不是這種多 Agent 編制，就用**旁白**（`you`）或一個單一敘事者帶讀即可，不必硬湊 5 個角色；也可以依專案自己的角色命名，對應到模板既有的樣式 class。
 
 ### 4. 撰寫
 
@@ -72,7 +72,7 @@ description: 把一個 OpenSpec 變更做成對話劇本式的單檔 HTML 導覽
 | 用途 | class |
 |------|------|
 | 頁面 | `section.slide`，帶 `data-chapter`、`data-name`；封面加 `cover` |
-| 對話 | `.chat` > `.say.<角色>`，角色為 `you`、`hyuse`、`chika`、`yuma`、`osamu`、`shiori` |
+| 對話 | `.chat` > `.say.<角色>`，角色為 `you`、`architect`、`backend`、`frontend`、`integrator`、`reviewer` |
 | 程式碼 | `.codebox` > `pre.code`，`data-lang` 為 `py`／`ts`／`json`，`data-hl="3-5,8"` 標重點行；下方 `.cap` 寫路徑與行號 |
 | 雙欄 | `.cols.c-talk`、`.c-talk-wide`（對話＋程式碼）、`.c-2` |
 | 操作步驟 | `ol.steps`，指令用 `.cmd`，預期結果用 `.look` |

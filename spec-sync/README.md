@@ -54,7 +54,7 @@ rules:
 
 ## 各 skill 的時機與處置
 
-delta 必須在歸檔前寫好，所以檢查前移到實作階段。最終閘門在單人流程是 `issue-solver`，在多 Agent 流程是 `issue-integrator`；**免同步只在最終閘門確認**（多 Agent 流程由開發 Agent 先在 `handoff.md` 聲明，Osamu 檢查通過後由 `/ship-issue` 主對話當下請 user 確認）。
+delta 必須在歸檔前寫好，所以檢查前移到實作階段。最終閘門在單人流程是 `issue-solver`，在多 Agent 流程是 `issue-integrator`；**免同步只在最終閘門確認**（多 Agent 流程由開發 Agent 先在 `handoff.md` 聲明，integrator 檢查通過後由 `/ship-issue` 主對話當下請 user 確認）。
 
 | skill | 時機 | 不通過時 |
 |-------|------|----------|
