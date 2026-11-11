@@ -10,14 +10,16 @@
   - `gen-html` — 用單檔 HTML 產生架構圖、流程圖、比較表等
   - `gen-story` — 把一個 OpenSpec 變更做成以圖表為主、對話劇本式的單檔 HTML 導覽投影片（版面檢查腳本需要 playwright，會擋下沒有圖或文字過多的頁面）
   - `draw-mermaid` — mermaid 圖表的選圖、畫法準則與渲染驗證（驗證腳本需要 docker）
-  - `backend-processor` — 多 Agent 流程的後端實作棒（可中斷接續、每項任務 WIP commit），附編輯後 lint hook
-  - `issue-architect` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案（含執行驗證觀察點）、前端實作（附編輯後 lint hook）、整合（檢查與執行驗證含截圖觀察點／收尾開 PR／歸檔／模擬合併隊列並合併），隨 `agent-team` 一起安裝
-  - `custom-review` — 多 Agent 流程的 reviewer（Shiori）：PR 前對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，PR 中評定內建 `/code-review`、`/security-review` 的發現，隨 `agent-team` 一起安裝
+  - `issue-architect` / `backend-processor` / `frontend-processor` / `issue-integrator` — 多 Agent 流程的提案（含執行驗證觀察點）、後端實作、前端實作（兩者可中斷接續、每項任務 WIP commit，附編輯後 lint hook）、整合（檢查與執行驗證含截圖觀察點／收尾開 PR／歸檔／模擬合併隊列並合併）。讀專案 `CLAUDE.md` 的「## agent-team 設定」支援 fullstack 與 single-side 兩種結構，隨兩種 agent-team kit 一起安裝
+  - `custom-review` — 多 Agent 流程的 reviewer：PR 前對照 OpenSpec 規格審查需求／測試覆蓋與邏輯，PR 中評定內建 `/code-review`、`/security-review` 的發現，隨兩種 agent-team kit 一起安裝
 - `.claude/commands/` — `opsx` 等 slash 指令
 - `linear/` — Linear 回填模板（question / analyze / change）
 - `spec-sync/` — 規格同步閘門的設定檔格式與範例（專案放 `openspec/spec-sync.yaml` 才啟用）
 - `CLAUDE.md` — 跨專案通用的開發習慣
-- `agent-team/` — 多 Agent 開發工作流的建置文件與 team-hq 骨架（五個角色含審查員 Shiori；`/ship-issue` 從提案一路自動做到合併：PR 前兩項檢查、PR 中四項檢查（CI、`/code-review`、`/security-review`、按風險審批）、模擬合併隊列，只有高風險時停下等你回覆「合併」；`review.md` 範本、寫入範圍限制 hook；只在選 `agent-team` 時安裝）
+- `agent-team-fullstack/`、`agent-team-single-side/` — 多 Agent 開發工作流的兩種骨架與導入文件，都是「一個 repo、從 repo 根目錄啟動」：
+  - **fullstack**：一個 repo 同時有前後端（例：`backend/`、`frontend/`）。五個角色（architect、後端、前端、integrator、reviewer），一份 worktree、一份變更目錄、一個 PR；後端與前端 Agent 依序派工，寫入範圍 hook 依子目錄限制
+  - **single-side**：一個 repo 只有一端、只用一個開發 Agent（四個角色）
+  - 兩者共用：`/ship-issue` 從提案一路自動做到合併（PR 前兩項檢查、PR 中四項檢查、模擬合併隊列，只有高風險時停下等你回覆「合併」）、`handoff.md`／`review.md` 範本、寫入範圍限制 hook；只在選對應選項時安裝
 
 ## 安裝 / 更新到其他專案
 
@@ -33,11 +35,14 @@ curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/m
 # 只裝 draw-mermaid
 curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- draw-mermaid
 
-# 除 agent-team 外全部裝到指定專案
+# 除 agent-team kit 外全部裝到指定專案
 curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- all /path/to/your-project
 
-# 在新的協作中樞 repo 建立 agent-team 骨架
-curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- agent-team /path/to/team-hq
+# 一個 repo 同時有前後端：裝 fullstack 的多 Agent 骨架
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- agent-team-fullstack /path/to/your-project
+
+# 一個 repo 只有一端：裝 single-side 的多 Agent 骨架
+curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- agent-team-single-side /path/to/your-project
 
 # 列出全部可選項／顯示用法
 curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- --list
@@ -83,29 +88,43 @@ rm littleduck-install.sh
 | `issue-reader` / `issue-processor` / `issue-solver` | 三段式 skill 一起裝，加上全部 `openspec-*` skill、`.claude/commands/opsx/`、`linear/` 模板、`spec-sync/` |
 | `openspec-<名稱>` | 該 skill 與對應的 `.claude/commands/opsx/*.md` 指令 |
 | `gen-html`、`gen-story`、`draw-mermaid` | 只有該 skill 本身 |
-| `backend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；裝在後端 repo，供 agent-team 的後端 Agent 使用 |
-| `frontend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；`agent-team` 已會裝進 team-hq，只有想在前端 repo 單獨使用時才需另外安裝 |
+| `backend-processor` / `frontend-processor` | 該 skill（含 `hooks/post-edit-lint.sh`）與 `spec-sync/`；兩種 agent-team kit 都已包含，只有不用 kit、想單獨使用時才需另外安裝 |
 | `issue-architect` / `issue-integrator` | 該 skill，加上整組 issue 流程（同 `issue-reader`）；`issue-architect` 另帶 `draw-mermaid` |
-| `all` | 除 agent-team 外的全部 `.claude/skills/`、`.claude/commands/`、`linear/`、`spec-sync/` |
-| `agent-team` | 骨架：`CLAUDE.md`（team-hq 版）、`.claude/agents/` 五個角色（hyuse／chika／yuma／osamu／shiori）、`.claude/commands/ship-issue.md`、`.claude/hooks/guard-write-scope.sh`、`docs/multi-agent-workflow.md`、`openspec/handoff-template.md`、`openspec/review-template.md`；再加上角色 skill `issue-architect`、`issue-integrator`、`frontend-processor`、`custom-review` 與它們的相依（issue 流程、`openspec-*`、`draw-mermaid`、`opsx` 指令、`linear/`、`spec-sync/`）。`backend-processor` 不在其中，要另外裝到後端 repo |
+| `all` | 除 agent-team kit 外的全部 `.claude/skills/`、`.claude/commands/`、`linear/`、`spec-sync/` |
+| `agent-team-fullstack` | 骨架：`CLAUDE.md`（含「## agent-team 設定」，`結構: fullstack`）、`.claude/agents/` 五個角色（architect、後端、前端、integrator、reviewer；預設名稱 hyuse／chika／yuma／osamu／shiori）、`.claude/commands/ship-issue.md`、`.claude/hooks/guard-write-scope.sh`（依子目錄限制開發 Agent）、`docs/multi-agent-workflow.md`、`openspec/handoff-template.md`、`openspec/review-template.md`；再加上角色 skill `issue-architect`、`issue-integrator`、`backend-processor`、`frontend-processor`、`custom-review` 與它們的相依（issue 流程、`openspec-*`、`draw-mermaid`、`opsx` 指令、`linear/`、`spec-sync/`） |
+| `agent-team-single-side` | 同上，但骨架只有四個角色（一個開發 Agent），`CLAUDE.md` 宣告 `結構: single-side` 與「端」（`backend` 或 `frontend`），開發 Agent 依「端」走對應的 processor skill |
+| ~~`agent-team`~~ | 已移除（前後端分兩個 repo 的版本不再維護）；選它會報錯並指引改用上面兩個 |
 
 skill 的相依寫在 repo 根目錄的 `install.deps`；新增 skill 時若它會呼叫其他 skill、指令或模板，記得在這裡補上。
 
 ### CLAUDE.md
 
-除 `agent-team` 外，任何選項都會在目標專案**沒有** `CLAUDE.md` 時建立通用版本。目標已有 `CLAUDE.md` 時**不覆寫**，只印出略過訊息，需要的話請自行把本 repo 的 `CLAUDE.md` 合併進去。
+除兩種 agent-team kit 外，任何選項都會在目標專案**沒有** `CLAUDE.md` 時建立通用版本（kit 則建立自己的 `CLAUDE.md` 範本）。目標已有 `CLAUDE.md` 時**不覆寫**，只印出略過訊息，需要的話請自行把本 repo 的 `CLAUDE.md` 合併進去。
 
-### agent-team
+### agent-team kit
 
-骨架是「不存在才建立」：已存在的檔案（例如你改過的 agent 定義）一律略過，不覆寫。
-這也代表本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑。
-例如 `openspec/handoff-template.md` 新增了「## 狀態」區塊，`backend-processor` 依賴它，舊骨架要先移除該檔再重跑才拿得到。
-又例如 `hyuse.md`、`yuma.md`、`osamu.md`、`ship-issue.md` 改為引用隨附的角色 skill 與 hook；用舊骨架建立的 team-hq 要先移除這幾個檔再重跑。
-加入審查員 Shiori 後，新增的骨架檔 `.claude/agents/shiori.md` 與 `openspec/review-template.md` 也是「不存在才建立」，`osamu.md`、`ship-issue.md` 則改成「檢查 → 程式碼審查 → 收尾」流程；已安裝的 team-hq 要取這些更新，同樣得先移除舊的 `osamu.md`、`ship-issue.md` 再重跑（`custom-review` skill 會自動覆寫更新）。
-**全自動流程（SDP-111）**：`/ship-issue` 拿掉了檢查點 1、2 與 shadow mode，改由 Osamu 歸檔後模擬合併隊列並合併 PR。已安裝的 team-hq 要先移除 `ship-issue.md`、`osamu.md`、`shiori.md`、`openspec/handoff-template.md`、`openspec/review-template.md` 再重跑，並手動更新 team-hq `CLAUDE.md`；完整步驟見 `docs/multi-agent-workflow.md`「從舊版流程升級」。新版 `issue-integrator` 搭舊版 `ship-issue.md` 會在歸檔前停下，不會誤合併。
+兩種 kit 都裝在**專案 repo 的根目錄**，平常就從這裡啟動 Claude Code：
 
-角色 skill（`issue-architect`、`issue-integrator`、`frontend-processor` 與其相依）則和其他 skill 一樣**每次重跑都覆寫更新**，請勿在 team-hq 直接修改。
-安裝後把 `CLAUDE.md` 與 agent 定義裡的 `<frontend-repo>`、`<backend-repo>` 等佔位換成實際路徑，完整說明見 `docs/multi-agent-workflow.md`。
+| 專案結構 | 選項 | 開發 Agent |
+|----------|------|-----------|
+| 一個 repo 同時有前後端（例：`backend/` + `frontend/`、`crates/` + `web/`） | `agent-team-fullstack` | 後端、前端各一個，共用 worktree 依序派工 |
+| 一個 repo 只有一端（例：純 API、純前端、桌面程式、CLI） | `agent-team-single-side` | 一個，依「端」走 `backend-processor` 或 `frontend-processor` |
+
+- 安裝後在專案 `CLAUDE.md` 填好「## agent-team 設定」（結構、主幹、worktree 根目錄、子目錄或端）與「## 檢查指令」；角色 skill、`/ship-issue`、寫入範圍 hook 都讀這一段，不寫死目錄。專案已有 `CLAUDE.md` 時 installer 不覆寫，要手動把 kit 的段落合併進去。
+- 骨架是「不存在才建立」：已存在的檔案（Agent 定義、`ship-issue.md`、hook、範本、`CLAUDE.md`）一律略過，不覆寫。本 repo 更新範本後不會自動傳到已安裝的專案；要取新版請先移除或改名舊檔再重跑，或參考 kit 目錄手動合併。
+- 角色 skill（`issue-architect`、`issue-integrator`、`backend-processor`、`frontend-processor`、`custom-review` 與其相依）和其他 skill 一樣**每次重跑都覆寫更新**，請勿在專案內直接修改。
+- **Agent 名稱可以改**（改定義檔檔名、`name`、`CLAUDE.md` 的 Agent 表與 `ship-issue.md`）。角色 skill 只用角色稱呼、不寫 Agent 名稱，hook 的參數也是角色（`architect`、`integrator`、`backend`、`frontend`），所以重跑 installer 後不必再改 `.claude/skills/`。**改名後重跑 installer 會再建立範本名稱的 Agent 定義**（同名檔不存在就建立），重跑後要刪掉多出來的範本名稱定義檔，否則會有兩套 Agent。
+- 完整說明見 kit 內的 `docs/multi-agent-workflow.md`。
+
+#### 從舊版 agent-team 遷移
+
+舊版 `install.sh agent-team`（協作中樞 repo 加上前後端分兩個 repo）已移除。已用舊版、在單一 repo 裡靠覆寫段落運作的專案：
+
+1. 先 diff 現有骨架與舊版 kit，列出專案自己的差異（Agent 名稱、color、模型、檢查指令、專案規則）。
+2. 依專案結構執行 `install.sh agent-team-fullstack <repo>` 或 `install.sh agent-team-single-side <repo>`：角色 skill 更新為新版，已存在的骨架檔會被略過。
+3. 以新版 kit 的骨架為底逐檔合併第 1 步的差異：hook 參數改成角色名稱，刪掉「本專案的差異（單一 repo）」之類的覆寫段落。
+4. 專案 `CLAUDE.md` 加「## agent-team 設定」，刪掉單一 repo 的對照段落；執行驗證、變異測試、高風險檔案樣式等專案設定保留。
+5. 驗收：`grep -riE '前端 ?repo|後端 ?repo|team-?hq' .claude/skills/` 應無輸出；用一張小 issue 跑 `/ship-issue`。
 
 ### Tab 補齊（bash，僅本地 clone）
 
@@ -125,7 +144,7 @@ source /path/to/littleduck-skills/completions/install.bash
 
 **可重複執行**：再跑一次即就地更新到最新版本，不會產生重複或巢狀副本。缺少的目標目錄會自動建立。
 
-> 注意：安裝會以本 repo 的版本覆寫目標專案中同名的 skill、指令與模板（`CLAUDE.md` 與 agent-team 骨架除外），請勿在目標專案直接修改這些檔案。
+> 注意：安裝會以本 repo 的版本覆寫目標專案中同名的 skill、指令與模板（`CLAUDE.md` 與 agent-team kit 骨架除外），請勿在目標專案直接修改這些檔案。
 
 ## Remote Control（手機監看）
 

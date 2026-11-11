@@ -1,7 +1,7 @@
 # install.sh 的 skill 相依宣告。一行一個 skill：<skill>: <資產>...
 # 資產格式：skill:<skill 名稱>、commands:<.claude/commands/ 下的相對路徑>、dir:<repo 根目錄下的目錄>
 # 未列出的 skill 視為無相依，只安裝它自己的目錄。相依會遞迴展開並去重。
-# 特例：`agent-team` 不是 skill，它那一列只能寫 skill:，代表選 agent-team 時除了骨架還要一併安裝的角色 skill。
+# 特例：`agent-team-fullstack`、`agent-team-single-side` 不是 skill，它們那一列只能寫 skill:，代表選該 kit 時除了骨架還要一併安裝的角色 skill。
 
 openspec-apply-change:   commands:opsx/apply.md
 openspec-archive-change: commands:opsx/archive.md
@@ -22,5 +22,6 @@ frontend-processor: dir:spec-sync
 issue-architect:  skill:issue-reader skill:draw-mermaid
 issue-integrator: skill:issue-reader
 
-# agent-team 骨架之外，一併裝進 team-hq 的角色 skill（backend-processor 另外裝到後端 repo）
-agent-team: skill:issue-architect skill:issue-integrator skill:frontend-processor skill:custom-review
+# agent-team kit 骨架之外，一併裝進專案根目錄的角色 skill（兩種 kit 相同；single-side 依宣告的端只用其中一個 processor）
+agent-team-fullstack:   skill:issue-architect skill:issue-integrator skill:backend-processor skill:frontend-processor skill:custom-review
+agent-team-single-side: skill:issue-architect skill:issue-integrator skill:backend-processor skill:frontend-processor skill:custom-review
