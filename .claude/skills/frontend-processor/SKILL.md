@@ -1,41 +1,44 @@
 ---
 name: frontend-processor
-description: 多 Agent 流程的前端實作（Yuma）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [FE] 項 → 在前端 worktree 實作（後端未定稿時依 openapi.yaml 以型別與 mock 先行），每完成一項 [FE] 任務即 WIP commit 並 push → lint／typecheck／test → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the frontend agent is dispatched by /ship-issue, or the user asks to run /frontend-processor on a change-id.
+description: 多 Agent 流程的前端實作（前端 Agent；single-side 宣告端為 frontend 時的開發 Agent）：讀 OpenSpec 變更目錄的 proposal／design／openapi.yaml／tasks 的 [FE] 項 → 在 worktree 的前端子目錄實作（fullstack 時接在後端 Agent 交棒之後；契約未定稿時依 openapi.yaml 以型別與 mock 先行），每完成一項 [FE] 任務即 WIP commit 並 push → lint／typecheck／test → 更新 handoff.md；支援中斷後的接續模式。不開 PR、不歸檔。Use when the frontend agent is dispatched by /ship-issue, or the user asks to run /frontend-processor on a change-id.
 ---
 
 # Skill: Frontend Processor
 
-多 Agent 流程的**前端實作棒**（流程總覽見 team-hq 的 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`），結構與後端的 `backend-processor` 對稱。
+多 Agent 流程的**前端實作棒**（流程總覽見專案 `CLAUDE.md` 與 `docs/multi-agent-workflow.md`），結構與後端的 `backend-processor` 對稱。
 
-**呼叫方式**：由 `/ship-issue` 派前端 Agent，或在 team-hq 啟動的 session 中指名「Yuma 執行 /frontend-processor `<change-id>`」。
+**呼叫方式**：由 `/ship-issue` 派前端 Agent，或在 repo 根目錄啟動的 session 中指名前端 Agent 執行 /frontend-processor `<change-id>`。
 
 ## 輸入
 
 - change-id（全小寫、以 Linear issue 代號開頭，例：`eng-123-order-export`）
-- 前端 worktree 路徑（以下稱 `<frontend-worktree>`）
+- worktree 路徑（以下稱 `<worktree>`，例：`wt/eng-123-order-export`）
 - 「接續模式」（選填）：中斷後重新派工時帶入，表示這個 change 已經有進度。
 
-**所有修改只發生在 `<frontend-worktree>` 內。**
+**前端目錄**（以下稱 `<frontend-dir>`）取自專案 `CLAUDE.md` 的「## agent-team 設定」：fullstack 為 `<worktree>/<前端子目錄>`（欄位列多個路徑時取**第一項**，其餘項目也屬於前端 Agent 可寫的範圍）；single-side 為 `<worktree>/<程式碼目錄>`（且宣告的端必須是 `frontend`）。這一段不存在或缺欄位就停下回報，不要猜目錄。
+
+**所有修改只發生在前端子目錄欄位列出的路徑（single-side 為 `<frontend-dir>`）與變更目錄 `<worktree>/openspec/changes/<change-id>/` 內**；fullstack 時後端子目錄屬於後端 Agent，寫入範圍 hook 會擋。
 
 進度的依據是 `handoff.md` 的**狀態區塊**（`## 狀態`，就地改值），不是對話記憶，也不是 `.linear.md` 的 `stage`。
 
 ### 技術棧指令從哪裡來
 
-套件安裝、型別與 API client 產生、mock、lint、typecheck、test 的實際指令，**一律以前端 repo 的 `CLAUDE.md` 與本 change 的 `design.md` 為準**。兩份都沒寫某項指令時，**停下回報缺少哪一項**，不要自行猜指令（subagent 不能問 user，由主對話去問）。本 skill 以下只寫「跑 lint」「跑測試」，不寫具體工具。
+套件安裝、型別與 API client 產生、mock、lint、typecheck、test 的實際指令，**一律以專案 `CLAUDE.md`（「## 檢查指令」的前端欄）與本 change 的 `design.md` 為準**，在 `<frontend-dir>` 執行。兩份都沒寫某項指令時，**停下回報缺少哪一項**，不要自行猜指令（subagent 不能問 user，由主對話去問）。本 skill 以下只寫「跑 lint」「跑測試」，不寫具體工具。
 
 ---
 
 ## 步驟 1：讀交接資料（缺檔即停）
 
-讀 `<frontend-worktree>/openspec/changes/<change-id>/` 下的 `proposal.md`、`design.md`、`openapi.yaml`、`tasks.md`、`handoff.md` 與 `specs/`，以及前端 repo 的 `CLAUDE.md`。
+讀 `<worktree>/openspec/changes/<change-id>/` 下的 `proposal.md`、`design.md`、`openapi.yaml`、`tasks.md`、`handoff.md` 與 `specs/`，以及專案 `CLAUDE.md`（含「## agent-team 設定」）。
 
 - **任何一份不存在，就停下回報缺檔**，不要開始切版或串接。
 - `handoff.md` 沒有狀態區塊（`## 狀態`）時，停下回報，提示 user 依新版 `handoff-template.md` 補上，不要自行補建。
-- **分支**：有 `.linear.md` 時，`git -C <frontend-worktree> branch --show-current` 必須等於它的 `branch`；沒有 `.linear.md` 時，目前分支不得是預設分支。不符就停下回報。
+- **分支**：有 `.linear.md` 時，`git -C <worktree> branch --show-current` 必須等於它的 `branch`；沒有 `.linear.md` 時，目前分支不得是預設分支。不符就停下回報。
 - **ISSUE-ID**：有 `.linear.md` 就取 `primary_issue`；沒有時，從 change-id 開頭擷取 Linear 代號（`[a-z][a-z0-9]*-\d+`，不分大小寫）並轉成大寫。
 - 只處理 `tasks.md` 中以 `[FE]` 開頭的項目。
-- **契約是否已定稿**：`handoff.md` 已有「backend」一節，就表示後端已定稿 `openapi.yaml`（定稿版會由後端提交到本 worktree）。
-- 依賴套件尚未安裝時（例：沒有 `node_modules/`），依前端 `CLAUDE.md` 的方式安裝。
+- **fullstack 的開工順序**：`tasks.md` 有 `[BE]` 任務時，必須等後端 Agent 交棒——狀態區塊的階段為 `frontend`（或接續模式下已是 `frontend`）且 `handoff.md` 已有「backend」一節。階段還是 `proposal`／`backend` 就**停下**回報「後端尚未交棒」，不要開始改檔。
+- **契約是否已定稿**：`handoff.md` 已有「backend」一節，就表示後端已就地定稿 `openapi.yaml`（同一份檔案，不必另外同步）。
+- 依賴套件尚未安裝時（例：沒有 `node_modules/`），依專案 `CLAUDE.md` 的方式在 `<frontend-dir>` 安裝。
 
 ### 接續檢查（依序；非接續模式也要做第 1、2 點）
 
@@ -49,8 +52,8 @@ description: 多 Agent 流程的前端實作（Yuma）：讀 OpenSpec 變更目�
 
 `openapi.yaml` 是串接的**唯一依據**。**不改 `openapi.yaml`**；契約有問題時，記錄在 `handoff.md`，並回報要退回後端 Agent（欄位或行為不合用）或 architect（需求本身有問題）。
 
-- **型別與 API client**：沿用前端 repo 既有的產生器與產出格式。如果產生器會以整份 schema 覆蓋整個產出目錄，**不要拿變更目錄裡只含本次端點的 `openapi.yaml` 直接跑它**，否則既有的型別會被刪掉。改為產到暫存目錄（例：`/tmp/<change-id>-api`），再只把本次新增或變動的 model 與 service 搬進產出目錄。
-- **mock**：後端尚未定稿時，依前端 repo 既有的 mock 機制，為新端點補上 handler，先以 mock 切版。repo 有 mock 覆蓋率檢查時，一併跑過。
+- **型別與 API client**：沿用專案既有的產生器與產出格式。如果產生器會以整份 schema 覆蓋整個產出目錄，**不要拿變更目錄裡只含本次端點的 `openapi.yaml` 直接跑它**，否則既有的型別會被刪掉。改為產到暫存目錄（例：`/tmp/<change-id>-api`），再只把本次新增或變動的 model 與 service 搬進產出目錄。
+- **mock**：後端尚未定稿時（例：single-side 前端專案依外部 API 契約先行），依專案既有的 mock 機制，為新端點補上 handler，先以 mock 切版。專案有 mock 覆蓋率檢查時，一併跑過。fullstack 時後端已先定稿，通常直接串接即可。
 - 後端定稿後，若 `openapi.yaml` 有變動（看 `handoff.md` backend 節的「API 契約變動」），回頭同步型別與 mock。
 
 型別與 mock 本身若是 `tasks.md` 的一項任務，就照步驟 3 的循環提交；若不是，就併入第一項用到它的任務一起提交。
@@ -67,24 +70,24 @@ description: 多 Agent 流程的前端實作（Yuma）：讀 OpenSpec 變更目�
 6. **push**：第一次用 `git push -u origin <branch>`，之後用 `git push`。
 
 ```bash
-git -C <frontend-worktree> add openspec/changes/eng-200-export/tasks.md \
+git -C <worktree> add openspec/changes/eng-200-export/tasks.md \
                                openspec/changes/eng-200-export/handoff.md \
                                src/features/export/ExportButton.tsx \
                                src/features/export/ExportButton.test.tsx
-git -C <frontend-worktree> commit -m "wip(ENG-200): 3.1 匯出按鈕與下載流程
+git -C <worktree> commit -m "wip(ENG-200): 3.1 匯出按鈕與下載流程
 
 Co-Authored-By: <依系統提供的署名>"
-git -C <frontend-worktree> push
-git -C <frontend-worktree> status --porcelain   # 必須為空；有殘留就補進下一筆 commit
+git -C <worktree> push
+git -C <worktree> status --porcelain   # 必須為空；有殘留就補進下一筆 commit
 ```
 
 規則：
 
-- 規格分類與撰寫方式依前端 `CLAUDE.md`。跨前後端的流程圖以後端為準，前端只畫前端特有的內容。
+- 規格分類與撰寫方式依專案 `CLAUDE.md`。跨前後端的流程圖以後端為準，前端只畫前端特有的內容。
 - 編輯檔案後，PostToolUse hook 會自動跑 lint；失敗的訊息要修掉，不要忽略。
 - pre-commit hook 失敗就修好再 commit，**不得使用 `--no-verify`**。
 - push 失敗就**停下**，在狀態區塊的「暫停原因」註明「commit 尚未推送」並回報；不 force push。
-- **規格同步**：前端 repo 有 `openspec/spec-sync.yaml` 時，改到命中規則的路徑，就在**同一項任務內**補上規格並一起 commit（規則與判定只讀 `spec-sync/README.md`）：
+- **規格同步**：專案有 `openspec/spec-sync.yaml` 時，改到命中規則的路徑，就在**同一項任務內**補上規格並一起 commit（規則與判定只讀 `spec-sync/README.md`）：
   - `capability` 目標：寫或更新本 change 的 delta（`openspec/changes/<change-id>/specs/<capability>/spec.md`）。**不要直接改 `openspec/specs/` 的主規格**。
   - `spec_dir` 目標：更新文件本身。
 
@@ -98,7 +101,7 @@ git -C <frontend-worktree> status --porcelain   # 必須為空；有殘留就補
 
 ## 步驟 4：檢查
 
-在 `<frontend-worktree>` 依前端 `CLAUDE.md` 跑 **lint、typecheck、test** 三項，三項都要實際通過。
+在 `<frontend-dir>` 依專案 `CLAUDE.md` 跑 **lint、typecheck、test** 三項（專案註明「無」的項目記為不適用），三項都要實際通過。
 
 - 失敗且確定不是本次造成的（既有的 baseline 失敗），在 `handoff.md` 註明哪幾項、怎麼確認不是本次造成的。
 - 為了讓檢查通過而改了程式碼：另做一筆 `wip(<ISSUE-ID>): 修正檢查`（同樣列出路徑 `git add`、commit、push）。
@@ -108,7 +111,7 @@ git -C <frontend-worktree> status --porcelain   # 必須為空；有殘留就補
 1. 在 `handoff.md` 追加「frontend（<Agent 名稱>）」一節，內容包括：做了什麼、未完成、風險，以及**仍靠 mock、等後端定稿後才能串接的部分**（格式見範本）。
 2. 狀態區塊：
    - 階段改為 `integrating`；
-   - 「下一步」寫「等待 integrator 檢查」；後端仍未完成時，寫「等待後端完成」；
+   - 「下一步」寫「等待 integrator 檢查」；
    - 「暫停原因」填「無」；
    - 更新「最後完成」與「更新」。
 3. 有 `.linear.md` 時，把 `stage` 改為 `applied`（已經是 `applied` 就不動）。
@@ -121,7 +124,7 @@ git -C <frontend-worktree> status --porcelain   # 必須為空；有殘留就補
 - 型別與 mock 和目前的 `openapi.yaml` 一致；
 - 有 `openspec/spec-sync.yaml` 時，命中規則的目標已補上，或 `handoff.md` 已逐目標寫免同步聲明；
 - `handoff.md` 已追加 frontend 節；
-- 前端 worktree 乾淨，本機分支與遠端一致；
+- worktree 乾淨，本機分支與遠端一致；
 - 狀態區塊的階段為 `integrating`。
 
 ---
@@ -130,5 +133,5 @@ git -C <frontend-worktree> status --porcelain   # 必須為空；有殘留就補
 
 - 只做 WIP commit 與一般 `git push`。**不 force push、不改寫已推送的歷史、不用 `--no-verify`、不用 `git add -A`／`git add .`**。
 - 不開 PR、不歸檔，那是 integrator 的工作（integrator 檢查通過後，會把 WIP commit 重切成依功能分組的 commit）。
-- 不改 `proposal.md` 與 `openapi.yaml`；不碰 `<frontend-worktree>` 以外的檔案。
+- 不改 `proposal.md` 與 `openapi.yaml`；不碰 `<frontend-dir>` 與變更目錄以外的檔案。
 - 不跑會對整個 repo 越界 autofix 的指令；不自行處理任何憑證或 token。
