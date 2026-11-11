@@ -3,10 +3,12 @@
 #
 # 依選項把本 repo 的可散佈資產同步進目標專案：
 #   <skill 名稱>  該 skill 與它在 install.deps 宣告的相依（其他 skill、指令、linear/ 模板、spec-sync/ 說明）
-#   all           除 agent-team 以外的全部 skills、commands、linear/ 模板、spec-sync/ 說明
-#   agent-team    多 Agent 協作中樞（team-hq）骨架（已存在的檔案一律略過），
-#                 加上 install.deps 的 agent-team 列宣告的角色 skill 及其相依（每次覆寫更新）
-# 除 agent-team 外，目標專案沒有 CLAUDE.md 時會一併建立通用開發習慣的 CLAUDE.md（已存在則不覆寫）。
+#   all                     除 agent-team kit 以外的全部 skills、commands、linear/ 模板、spec-sync/ 說明
+#   agent-team-fullstack    多 Agent 流程骨架：一個 repo 同時有前後端（已存在的檔案一律略過），
+#                           加上 install.deps 該列宣告的角色 skill 及其相依（每次覆寫更新）
+#   agent-team-single-side  多 Agent 流程骨架：一個 repo 只有一端、一個開發 Agent（同上）
+# 舊選項 agent-team（前後端分兩個 repo）已移除，選它會報錯並指引改用上面兩個。
+# 除 agent-team kit 外，目標專案沒有 CLAUDE.md 時會一併建立通用開發習慣的 CLAUDE.md（已存在則不覆寫）。
 #
 # 用法（遠端，免 clone）：
 #   curl -fsSL https://raw.githubusercontent.com/StevenShih-0402/littleduck-skills/main/install.sh | sh -s -- <選項> [目標專案路徑]
@@ -129,15 +131,17 @@ else
   SOURCE_DESC=$REPO_DIR
 fi
 DEPS_FILE="$REPO_DIR/install.deps"
-KIT_DIR="$REPO_DIR/agent-team"
+KIT_NAMES="agent-team-fullstack agent-team-single-side"
 
-# --- 可選項：.claude/skills/ 下的目錄名 + all + agent-team ---
+# --- 可選項：.claude/skills/ 下的目錄名 + all + 兩種 agent-team kit ---
 list_names() {
   for dir in "$REPO_DIR"/.claude/skills/*/; do
     [ -d "$dir" ] && basename "$dir"
   done
   echo all
-  echo agent-team
+  for kit in $KIT_NAMES; do
+    echo "$kit"
+  done
 }
 
 usage() {
@@ -149,8 +153,9 @@ usage() {
   echo "選項（必填，擇一）："
   list_names | sed 's/^/  /'
   echo
-  echo "  all        = 除 agent-team 以外全部"
-  echo "  agent-team = 多 Agent 協作中樞骨架（已存在的檔案不覆寫）＋角色 skill"
+  echo "  all                    = 除 agent-team kit 以外全部"
+  echo "  agent-team-fullstack   = 多 Agent 流程骨架（一個 repo 有前後端；已存在的檔案不覆寫）＋角色 skill"
+  echo "  agent-team-single-side = 多 Agent 流程骨架（一個 repo 只有一端、一個開發 Agent）＋角色 skill"
 }
 
 # --- 解析參數 ---
@@ -175,7 +180,14 @@ is_skill() {
 }
 
 case $SELECTION in
-  all|agent-team) ;;
+  all|agent-team-fullstack|agent-team-single-side) ;;
+  agent-team)
+    echo "錯誤：agent-team（前後端分兩個 repo）已移除。" >&2
+    echo "請依專案結構改用：" >&2
+    echo "  $INVOKE agent-team-fullstack   [目標專案路徑]   # 一個 repo 同時有前後端" >&2
+    echo "  $INVOKE agent-team-single-side [目標專案路徑]   # 一個 repo 只有一端、一個開發 Agent" >&2
+    exit 1
+    ;;
   *)
     if ! is_skill "$SELECTION"; then
       echo "錯誤：未知的安裝選項：$SELECTION" >&2
@@ -231,8 +243,9 @@ install_claude_md() {
   fi
 }
 
-# install_kit：逐檔複製 agent-team 骨架到目標根目錄，已存在的檔案略過
+# install_kit：逐檔複製所選 agent-team kit 的骨架到目標根目錄，已存在的檔案略過
 install_kit() {
+  KIT_DIR="$REPO_DIR/$SELECTION"
   skipped=0
   # 檔名不含空白與換行（由本 repo 控制），可安全逐行讀取
   file_list=$(mktemp)
@@ -249,16 +262,16 @@ install_kit() {
   done < "$file_list"
   rm -f "$file_list"
   echo
-  echo "完成：agent-team 骨架已安裝到 $TARGET（略過 $skipped 個既有檔案）"
+  echo "完成：$SELECTION 骨架已安裝到 $TARGET（略過 $skipped 個既有檔案）"
   echo "提示：範本更新不會覆寫已存在的檔案；要取新版請先移除或改名舊檔再重跑。"
 }
 
-# kit_skills：印出 install.deps 中 agent-team 列宣告的角色 skill，一行一個；該列只能寫 skill:
+# kit_skills：印出 install.deps 中所選 kit 那一列宣告的角色 skill，一行一個；該列只能寫 skill:
 kit_skills() {
-  for asset in $(deps_of agent-team); do
+  for asset in $(deps_of "$SELECTION"); do
     case $asset in
       skill:*) echo "${asset#skill:}" ;;
-      *) echo "錯誤：install.deps 的 agent-team 列只能寫 skill:，發現：$asset" >&2; exit 1 ;;
+      *) echo "錯誤：install.deps 的 $SELECTION 列只能寫 skill:，發現：$asset" >&2; exit 1 ;;
     esac
   done
 }
@@ -311,8 +324,8 @@ install_selected() {
 }
 
 case $SELECTION in
-  agent-team)
-    # 先讀清單再裝骨架：agent-team 列格式錯誤時，指令替換失敗會讓 set -e 在寫入任何檔案前中止
+  agent-team-fullstack|agent-team-single-side)
+    # 先讀清單再裝骨架：kit 列格式錯誤時，指令替換失敗會讓 set -e 在寫入任何檔案前中止
     role_skills=$(kit_skills)
     install_kit
     if [ -n "$role_skills" ]; then
