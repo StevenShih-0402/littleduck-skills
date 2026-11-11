@@ -1,0 +1,78 @@
+## MODIFIED Requirements
+
+### Requirement: Inputs are verified before any implementation
+
+`backend-processor` SHALL read the change's `proposal.md`, `design.md`, `openapi.yaml`, `tasks.md`, `handoff.md` and `specs/` from the worktree, and the backend subdirectory from the repository `CLAUDE.md` `## agent-team 設定` (the repository root when single-side). It MUST stop and report without editing code when any is missing or `handoff.md` has no `## 狀態` block. When `.linear.md` exists its `branch` MUST match the current branch; otherwise the current branch MUST NOT be the default branch.
+
+#### Scenario: Missing openapi draft
+
+- **WHEN** the change directory has no `openapi.yaml`
+- **THEN** the skill reports the missing file and makes no code change
+
+#### Scenario: No issue handoff file
+
+- **WHEN** the change has no `.linear.md` and the worktree is on a non-default branch
+- **THEN** the skill proceeds and takes the issue identifier from the change-id prefix
+
+#### Scenario: Old handoff without status block
+
+- **WHEN** `handoff.md` lacks a `## 狀態` block
+- **THEN** the skill stops and tells the user to add it following the current `handoff-template.md`
+
+#### Scenario: Structure not declared
+
+- **WHEN** the repository `CLAUDE.md` has no `## agent-team 設定` section
+- **THEN** the skill stops and reports the missing declaration without editing code
+
+### Requirement: OpenAPI is finalized from the implementation
+
+Before hand-off the skill SHALL make the change's single `openapi.yaml` match the implemented API in place and note changed fields in `handoff.md`. It MUST NOT copy `openapi.yaml` to another change directory.
+
+#### Scenario: Draft differs from implementation
+
+- **WHEN** the implemented response field name differs from the draft
+- **THEN** `openapi.yaml` is updated to the implementation and `handoff.md` names the changed field
+- **AND** no other copy of `openapi.yaml` is written
+
+### Requirement: Hand-off leaves a clean, synced state
+
+The skill SHALL finish by appending a backend section to `handoff.md`, setting the status block's stage to `frontend` when the structure is fullstack and `tasks.md` has `[FE]` tasks, otherwise to `integrating`, and pushing so the worktree is clean and not ahead. It MUST NOT open a PR, archive, edit `proposal.md`, or edit files outside the backend subdirectory and the change directory.
+
+#### Scenario: Normal completion
+
+- **WHEN** all `[BE]` tasks are done, tests pass, and `tasks.md` has no `[FE]` tasks
+- **THEN** the stage is `integrating`, no PR exists for the branch from this skill, and the change is not archived
+
+#### Scenario: Fullstack hand-off to frontend
+
+- **WHEN** all `[BE]` tasks are done in a fullstack repository and `tasks.md` has `[FE]` tasks
+- **THEN** the stage is `frontend`, the next step names the first `[FE]` task, and the worktree is clean and pushed
+
+### Requirement: Post-edit lint hook
+
+The skill SHALL ship a PostToolUse hook script that lints only the single edited `.py` file, running in the nearest ancestor directory of that file (up to the git root) that has an executable `pants` or a `pyproject.toml` with `[tool.ruff]`, or in the git root when none has one. It SHALL use `LITTLEDUCK_LINT_CMD` when set, otherwise an auto-detected linter in that directory, and do nothing when none is found. It MUST exit 2 with the lint output on failure, MUST NOT run format or fix commands, and SHALL print a non-blocking migration reminder when a model file is edited.
+
+#### Scenario: Lint failure is fed back
+
+- **WHEN** an edited `.py` file fails lint
+- **THEN** the hook exits 2 and prints the tail of the lint output
+
+#### Scenario: Non-Python file
+
+- **WHEN** an edited file is not `.py`
+- **THEN** the hook exits 0 without running anything
+
+#### Scenario: No linter available
+
+- **WHEN** `LITTLEDUCK_LINT_CMD` is unset and no supported linter is detected
+- **THEN** the hook exits 0
+
+#### Scenario: Model edited
+
+- **WHEN** `models.py` is edited and lint passes
+- **THEN** the hook prints a migration reminder and exits 0
+
+#### Scenario: Lint config in the backend subdirectory
+
+- **WHEN** `backend/pyproject.toml` has `[tool.ruff]`, and `backend/app/views.py` is edited
+- **THEN** the lint command runs in `backend/` with the path `app/views.py`

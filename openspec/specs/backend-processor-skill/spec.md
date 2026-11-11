@@ -2,13 +2,13 @@
 
 ## Purpose
 
-提供多 Agent 流程中後端實作棒的通用 skill：依 OpenSpec 交接資料在後端 worktree 逐項實作、可中斷接續，並附帶編輯後自動 lint 的 hook。
+提供多 Agent 流程中後端實作棒的通用 skill：依 OpenSpec 交接資料在 worktree 的後端子目錄逐項實作、可中斷接續，並附帶編輯後自動 lint 的 hook。
 
 ## Requirements
 
 ### Requirement: Inputs are verified before any implementation
 
-`backend-processor` SHALL read the change's `proposal.md`, `design.md`, `openapi.yaml`, `tasks.md`, `handoff.md` and `specs/` from the backend worktree, and MUST stop and report without editing code when any is missing or `handoff.md` has no `## 狀態` block. When `.linear.md` exists its `branch` MUST match the current branch; otherwise the current branch MUST NOT be the default branch.
+`backend-processor` SHALL read the change's `proposal.md`, `design.md`, `openapi.yaml`, `tasks.md`, `handoff.md` and `specs/` from the worktree, and the backend subdirectory from the repository `CLAUDE.md` `## agent-team 設定` (the repository root when single-side). It MUST stop and report without editing code when any is missing or `handoff.md` has no `## 狀態` block. When `.linear.md` exists its `branch` MUST match the current branch; otherwise the current branch MUST NOT be the default branch.
 
 #### Scenario: Missing openapi draft
 
@@ -24,6 +24,11 @@
 
 - **WHEN** `handoff.md` lacks a `## 狀態` block
 - **THEN** the skill stops and tells the user to add it following the current `handoff-template.md`
+
+#### Scenario: Structure not declared
+
+- **WHEN** the repository `CLAUDE.md` has no `## agent-team 設定` section
+- **THEN** the skill stops and reports the missing declaration without editing code
 
 ### Requirement: Work resumes safely after interruption
 
@@ -70,13 +75,13 @@ Test, lint, schema generation and migration commands SHALL be taken from the pro
 
 ### Requirement: OpenAPI is finalized from the implementation
 
-Before hand-off the skill SHALL make `openapi.yaml` match the implemented API, note changed fields in `handoff.md`, copy it to the frontend change directory when the change involves a frontend, and commit only that one file in the frontend worktree.
+Before hand-off the skill SHALL make the change's single `openapi.yaml` match the implemented API in place and note changed fields in `handoff.md`. It MUST NOT copy `openapi.yaml` to another change directory.
 
 #### Scenario: Draft differs from implementation
 
 - **WHEN** the implemented response field name differs from the draft
 - **THEN** `openapi.yaml` is updated to the implementation and `handoff.md` names the changed field
-- **AND** the frontend copy is identical to the backend file
+- **AND** no other copy of `openapi.yaml` is written
 
 ### Requirement: Specs are synced within the task
 
@@ -95,16 +100,21 @@ When `openspec/spec-sync.yaml` exists, a task that changes code matched by a rul
 
 ### Requirement: Hand-off leaves a clean, synced state
 
-The skill SHALL finish by appending a backend section to `handoff.md`, setting the status block's stage to `integrating`, and pushing so the worktree is clean and not ahead. It MUST NOT open a PR, archive, or edit `proposal.md`.
+The skill SHALL finish by appending a backend section to `handoff.md`, setting the status block's stage to `frontend` when the structure is fullstack and `tasks.md` has `[FE]` tasks, otherwise to `integrating`, and pushing so the worktree is clean and not ahead. It MUST NOT open a PR, archive, edit `proposal.md`, or edit files outside the backend subdirectory and the change directory.
 
 #### Scenario: Normal completion
 
-- **WHEN** all `[BE]` tasks are done and tests pass
+- **WHEN** all `[BE]` tasks are done, tests pass, and `tasks.md` has no `[FE]` tasks
 - **THEN** the stage is `integrating`, no PR exists for the branch from this skill, and the change is not archived
+
+#### Scenario: Fullstack hand-off to frontend
+
+- **WHEN** all `[BE]` tasks are done in a fullstack repository and `tasks.md` has `[FE]` tasks
+- **THEN** the stage is `frontend`, the next step names the first `[FE]` task, and the worktree is clean and pushed
 
 ### Requirement: Post-edit lint hook
 
-The skill SHALL ship a PostToolUse hook script that lints only the single edited `.py` file within its repository, using `LITTLEDUCK_LINT_CMD` when set, otherwise an auto-detected linter, and does nothing when none is found. It MUST exit 2 with the lint output on failure, MUST NOT run format or fix commands, and SHALL print a non-blocking migration reminder when a model file is edited.
+The skill SHALL ship a PostToolUse hook script that lints only the single edited `.py` file, running in the nearest ancestor directory of that file (up to the git root) that has an executable `pants` or a `pyproject.toml` with `[tool.ruff]`, or in the git root when none has one. It SHALL use `LITTLEDUCK_LINT_CMD` when set, otherwise an auto-detected linter in that directory, and do nothing when none is found. It MUST exit 2 with the lint output on failure, MUST NOT run format or fix commands, and SHALL print a non-blocking migration reminder when a model file is edited.
 
 #### Scenario: Lint failure is fed back
 
@@ -125,3 +135,8 @@ The skill SHALL ship a PostToolUse hook script that lints only the single edited
 
 - **WHEN** `models.py` is edited and lint passes
 - **THEN** the hook prints a migration reminder and exits 0
+
+#### Scenario: Lint config in the backend subdirectory
+
+- **WHEN** `backend/pyproject.toml` has `[tool.ruff]`, and `backend/app/views.py` is edited
+- **THEN** the lint command runs in `backend/` with the path `app/views.py`
