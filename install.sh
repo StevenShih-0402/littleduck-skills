@@ -4,7 +4,8 @@
 # 依選項把本 repo 的可散佈資產同步進目標專案：
 #   <skill 名稱>  該 skill 與它在 install.deps 宣告的相依（其他 skill、指令、linear/ 模板、spec-sync/ 說明）
 #   all                     除 agent-team kit 以外的全部 skills、commands、linear/ 模板、spec-sync/ 說明
-#   agent-team-fullstack    多 Agent 流程骨架：一個 repo 同時有前後端（已存在的檔案一律略過），
+#   agent-team-fullstack    多 Agent 流程骨架：一個 repo 同時有前後端（已存在的檔案一律略過；
+#                           .claude/agents/ 已有任何 Agent 定義時，範本 Agent 定義整組不建立），
 #                           加上 install.deps 該列宣告的角色 skill 及其相依（每次覆寫更新）
 #   agent-team-single-side  多 Agent 流程骨架：一個 repo 只有一端、一個開發 Agent（同上）
 # 舊選項 agent-team（前後端分兩個 repo）已移除，選它會報錯並指引改用上面兩個。
@@ -243,10 +244,23 @@ install_claude_md() {
   fi
 }
 
-# install_kit：逐檔複製所選 agent-team kit 的骨架到目標根目錄，已存在的檔案略過
+# has_agent_definitions：目標的 .claude/agents/ 第一層有任何 *.md（不論檔名）即成立
+has_agent_definitions() {
+  for f in "$TARGET"/.claude/agents/*.md; do
+    [ -e "$f" ] && return 0
+  done
+  return 1
+}
+
+# install_kit：逐檔複製所選 agent-team kit 的骨架到目標根目錄，已存在的檔案略過；
+# 目標安裝前已有 Agent 定義（可能改過名）時，範本 Agent 定義整組不建立，避免出現兩套 Agent
 install_kit() {
   KIT_DIR="$REPO_DIR/$SELECTION"
   skipped=0
+  agents_skipped=0
+  # 必須在迴圈前判斷：迴圈中建立的第一個範本不能讓其餘範本被略過
+  had_agents=0
+  has_agent_definitions && had_agents=1
   # 檔名不含空白與換行（由本 repo 控制），可安全逐行讀取
   file_list=$(mktemp)
   (cd "$KIT_DIR" && find . -type f | sed 's|^\./||' | sort) > "$file_list"
@@ -254,6 +268,10 @@ install_kit() {
     if [ -e "$TARGET/$rel" ]; then
       echo "  略過（已存在）：$rel"
       skipped=$((skipped + 1))
+    elif [ "$had_agents" -eq 1 ] && is_agent_template "$rel"; then
+      echo "  略過（.claude/agents/ 已有 Agent 定義，不建立範本名稱的 Agent）：$rel"
+      skipped=$((skipped + 1))
+      agents_skipped=$((agents_skipped + 1))
     else
       mkdir -p "$(dirname "$TARGET/$rel")"
       cp "$KIT_DIR/$rel" "$TARGET/$rel"
@@ -264,6 +282,18 @@ install_kit() {
   echo
   echo "完成：$SELECTION 骨架已安裝到 $TARGET（略過 $skipped 個既有檔案）"
   echo "提示：範本更新不會覆寫已存在的檔案；要取新版請先移除或改名舊檔再重跑。"
+  if [ "$agents_skipped" -gt 0 ]; then
+    echo "提示：目標已有 Agent 定義，未建立 $agents_skipped 個範本名稱的 Agent；要取範本請參考 littleduck-skills repo 的 $SELECTION/.claude/agents/ 手動合併。"
+  fi
+}
+
+# is_agent_template：kit 內的相對路徑是否為 Agent 定義範本（.claude/agents/ 第一層的 *.md）
+is_agent_template() {
+  case "$1" in
+    .claude/agents/*/*) return 1 ;;
+    .claude/agents/*.md) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # kit_skills：印出 install.deps 中所選 kit 那一列宣告的角色 skill，一行一個；該列只能寫 skill:
