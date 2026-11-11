@@ -31,7 +31,7 @@
 
 ### Requirement: Checks are executed, not trusted
 
-In a check run the skill SHALL stop unless the stage is `integrating`, then itself run, for each affected side inside its declared subdirectory, the tests, lint, type-check and migrations forward and backward when present (commands from the repository `CLAUDE.md` or `design.md`), the run verification described in the repository `CLAUDE.md` when present, and `openspec validate`. It MUST NOT accept a previous agent's report instead, and SHALL ask the user to start any required service that is down.
+In a check run the skill SHALL stop unless the stage is `integrating`, then itself run, for each affected side inside its declared subdirectory, the tests, lint, type-check and migrations forward and backward when present (commands from the repository `CLAUDE.md` or `design.md`), and `openspec validate`. It MUST NOT accept a previous agent's report instead.
 
 #### Scenario: Previous agent claimed tests pass
 
@@ -98,7 +98,7 @@ On any failure the skill SHALL append an integrator section to `handoff.md` with
 
 ### Requirement: Passing changes are recut, pushed with lease, and opened as PRs
 
-In a finish run, dispatched only after the pre-PR review has passed, the skill SHALL record the current HEAD, soft-reset to the merge-base with the base branch passed in (or, when the PR already exists, to the HEAD recorded at the previous finish, so earlier commits keep their SHAs), recommit by feature following `issue-solver`, verify `git diff <old> HEAD` is empty (restoring the old HEAD otherwise), push with `--force-with-lease=<branch>:<old>`, open or reuse one PR against that base, and append the `review.md` PR-note findings to the PR body. It MUST NOT use plain `--force`, and SHALL set the stage to `pr-checking`.
+In a finish run, dispatched only after the pre-PR review has passed, the skill SHALL record the current HEAD, soft-reset to the merge-base with the base branch passed in (or, when the PR already exists, to the HEAD recorded at the previous finish, so earlier commits keep their SHAs), recommit by feature following `issue-solver`, and verify `git diff <old> HEAD` is empty, restoring the old HEAD otherwise.
 
 #### Scenario: Lease rejected
 
@@ -199,3 +199,30 @@ In a check run the skill SHALL record each designated module's mutation outcome 
 
 - **WHEN** mutation testing runs against a designated module
 - **THEN** that module's score and threshold verdict appear in the `handoff.md` integrator section and the check report
+
+### Requirement: Check run includes run verification
+
+In a check run the skill SHALL also run the run verification described in the repository `CLAUDE.md` when it gives a start command, together with the change's `design.md` observation points.
+
+#### Scenario: Observation point fails
+
+- **WHEN** a command observation point does not produce its expected output
+- **THEN** the check fails and returns to the developer agent of the side the point belongs to
+
+### Requirement: Required services are started by the user
+
+When a service required by the checks (for example a database or cache) is not running, the skill SHALL stop and ask the user to start it, and MUST NOT start it itself.
+
+#### Scenario: Database not running
+
+- **WHEN** the tests need a database that is not running
+- **THEN** the skill stops and asks the user to start it, without starting it
+
+### Requirement: Finish run pushes with lease and opens one PR
+
+After a successful recut, the finish run SHALL push with `--force-with-lease=<branch>:<old>`, open or reuse one PR against the base branch, append the `review.md` PR-note findings to the PR body, and set the stage to `pr-checking`. It MUST NOT use plain `--force`.
+
+#### Scenario: Push after recut
+
+- **WHEN** the recut tree equals the old HEAD
+- **THEN** the branch is pushed with `--force-with-lease=<branch>:<old>`, never with plain `--force`

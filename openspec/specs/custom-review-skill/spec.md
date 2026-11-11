@@ -60,7 +60,7 @@ The review SHALL look for edge cases (null, empty collection, insufficient permi
 
 ### Requirement: Every finding is rated and only strong findings recommend a return
 
-For each finding — its own in review mode, and each supplied `/code-review` or `/security-review` finding in rating mode — the review SHALL record source, severity (high/medium/low), confidence (high/medium/low), file and line, the corresponding requirement (task id, Requirement › Scenario, or none), a description stating input → wrong result, and a recommended action. It SHALL recommend 「退回」 only for findings that are both high severity and high confidence; all others SHALL be recommended as 「PR 備註」.
+For each finding — its own in review mode, and each supplied `/code-review` or `/security-review` finding in rating mode — the review SHALL record source, severity (high/medium/low), confidence (high/medium/low), file and line, the corresponding requirement (task id, Requirement › Scenario, or none), a description stating input → wrong result, and a recommended action.
 
 #### Scenario: High severity but low confidence
 
@@ -99,3 +99,12 @@ When the prompt supplies earlier review rounds, `custom-review` SHALL review onl
 
 - **WHEN** the same wrong call pattern appears in three files of the diff
 - **THEN** the review reports one finding that lists all three locations
+
+### Requirement: Only high-severity high-confidence findings recommend a return
+
+The review SHALL recommend 「退回」 only for findings that are both high severity and high confidence; every other finding that holds up SHALL be recommended as 「PR 備註」.
+
+#### Scenario: Medium severity with high confidence
+
+- **WHEN** a finding is medium severity and the reviewer has code evidence for it
+- **THEN** its recommended action is 「PR 備註」

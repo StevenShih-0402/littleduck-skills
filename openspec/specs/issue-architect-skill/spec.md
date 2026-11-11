@@ -40,7 +40,7 @@ The skill SHALL create one `openspec/changes/<change-id>/` at the worktree root 
 
 ### Requirement: Tasks are tagged by side and design carries diagrams
 
-Every task line SHALL start with `[BE]` or `[FE]`, all in the one `tasks.md`. In `fullstack`, `[BE]` tasks SHALL come before the `[FE]` tasks that depend on them, because developers run in that order; in `single-side`, every task SHALL carry the declared side's tag. `design.md` SHALL contain at least one data-flow `flowchart` and one front/back `sequenceDiagram` drawn after loading `draw-mermaid`; a change without front/back interaction MAY omit the sequence diagram only when `design.md` states why.
+Every task line SHALL start with `[BE]` or `[FE]`, all in the one `tasks.md`. In `fullstack`, `[BE]` tasks SHALL come before the `[FE]` tasks that depend on them, because developers run in that order; in `single-side`, every task SHALL carry the declared side's tag.
 
 #### Scenario: Untagged task
 
@@ -118,3 +118,12 @@ The change's `design.md` SHALL contain a `## 變異測試目標` section naming 
 
 - **WHEN** the architect writes the `## 變異測試目標` section
 - **THEN** it names only modules or paths, not a mutation-testing tool, command, or pass threshold
+
+### Requirement: Design carries data-flow and sequence diagrams
+
+`design.md` SHALL contain at least one data-flow `flowchart` and one front/back `sequenceDiagram`, drawn after loading `draw-mermaid`; a change without front/back interaction MAY omit the sequence diagram only when `design.md` states why.
+
+#### Scenario: Change without front/back interaction
+
+- **WHEN** a single-side change has no front/back interaction
+- **THEN** `design.md` still has a data-flow `flowchart`, and either a sequence diagram or a stated reason for omitting it

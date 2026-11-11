@@ -65,7 +65,7 @@ The skill SHALL work in any project that uses OpenSpec without project-specific 
 
 ### Requirement: gen-story is read-only and verifies slide layout
 
-The skill SHALL only read the project and SHALL NOT modify the working tree, commit, or auto-publish. It SHALL provide a layout-check step that renders each slide and fails when content overflows its frame, needs scrolling, exceeds the canvas, collides with the footer, or (on any non-cover slide) lacks a visual component or exceeds the prose-length limit; the playwright runtime SHALL resolve from the current project's `node_modules` by default and be overridable via the `PLAYWRIGHT_FROM` environment variable.
+The skill SHALL only read the project and SHALL NOT modify the working tree, commit, or auto-publish; its only write is the generated story HTML.
 
 #### Scenario: No writes beyond the output HTML
 
@@ -114,3 +114,21 @@ The slide template SHALL provide, in addition to its existing flow, table, matri
 
 - **WHEN** 撰寫者查閱 `SKILL.md` 的元件表
 - **THEN** 每個圖表元件都列出 class 名稱與適用的內容類型
+
+### Requirement: Layout check rejects broken or text-heavy slides
+
+The skill SHALL provide a layout-check step that renders each slide and fails when content overflows its frame, needs scrolling, exceeds the canvas, or collides with the footer, or when a non-cover slide lacks a visual component or exceeds the prose-length limit.
+
+#### Scenario: Cover slide without a visual component
+
+- **WHEN** 版面檢查遇到沒有圖形元件的封面頁
+- **THEN** 不因此判為失敗；其他非封面頁仍要有圖形元件
+
+### Requirement: Layout check resolves playwright from the project
+
+The layout-check step SHALL resolve the playwright runtime from the current project's `node_modules` by default, and SHALL use the location in the `PLAYWRIGHT_FROM` environment variable when it is set.
+
+#### Scenario: Playwright installed elsewhere
+
+- **WHEN** `PLAYWRIGHT_FROM` 指向另一個已安裝 playwright 的目錄
+- **THEN** 版面檢查腳本改從該位置載入 playwright

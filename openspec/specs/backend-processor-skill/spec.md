@@ -114,7 +114,7 @@ The skill SHALL finish by appending a backend section to `handoff.md`, setting t
 
 ### Requirement: Post-edit lint hook
 
-The skill SHALL ship a PostToolUse hook script that lints only the single edited `.py` file, running in the nearest ancestor directory of that file (up to the git root) that has an executable `pants` or a `pyproject.toml` with `[tool.ruff]`, or in the git root when none has one. It SHALL use `LITTLEDUCK_LINT_CMD` when set, otherwise an auto-detected linter in that directory, and do nothing when none is found. It MUST exit 2 with the lint output on failure, MUST NOT run format or fix commands, and SHALL print a non-blocking migration reminder when a model file is edited.
+The skill SHALL ship a PostToolUse hook script that lints only the single edited `.py` file, using `LITTLEDUCK_LINT_CMD` when set, otherwise an auto-detected linter, and does nothing when none is found. It MUST exit 2 with the lint output on failure and MUST NOT run format or fix commands.
 
 #### Scenario: Lint failure is fed back
 
@@ -140,3 +140,21 @@ The skill SHALL ship a PostToolUse hook script that lints only the single edited
 
 - **WHEN** `backend/pyproject.toml` has `[tool.ruff]`, and `backend/app/views.py` is edited
 - **THEN** the lint command runs in `backend/` with the path `app/views.py`
+
+### Requirement: Backend lint hook runs in the nearest lint root
+
+The backend post-edit lint hook SHALL run the lint command in the nearest ancestor directory of the edited file, up to the git root, that has an executable `pants` or a `pyproject.toml` with `[tool.ruff]`, passing the file path relative to that directory, and SHALL use the git root when no ancestor qualifies.
+
+#### Scenario: Ruff config only at the git root
+
+- **WHEN** `backend/pyproject.toml` has no `[tool.ruff]`, the root `pyproject.toml` has it, and `backend/app/views.py` is edited
+- **THEN** the lint command runs in the git root with the path `backend/app/views.py`
+
+### Requirement: Backend lint hook reminds about migrations
+
+When the edited file is a model file (`models.py` or a file under a `models/` directory), the backend post-edit lint hook SHALL print a reminder to check for a needed migration, without changing its exit status.
+
+#### Scenario: Model file under a models directory
+
+- **WHEN** `app/models/order.py` is edited and lint passes
+- **THEN** the hook prints a migration reminder and exits 0
