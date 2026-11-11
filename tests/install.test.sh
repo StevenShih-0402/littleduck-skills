@@ -136,6 +136,61 @@ test_rerun_keeps_edited_agent_and_updates_skill() {
         "$(cat "${REPO_DIR}/.claude/skills/issue-architect/SKILL.md")" "skill 覆寫為新版"
 }
 
+# 把 .claude/agents/ 內每個範本 Agent 定義改名為 renamed-<原名>，模擬專案自訂 Agent 名稱
+rename_all_agents() {
+    local f
+    for f in "${TARGET}"/.claude/agents/*.md; do
+        mv "${f}" "${TARGET}/.claude/agents/renamed-$(basename "${f}")"
+    done
+}
+
+# .claude/agents/ 的檔名與內容摘要；檔案增減或內容改變都會讓摘要不同
+agents_digest() {
+    (cd "${TARGET}/.claude/agents" && ls -A && cat ./*.md) | cksum
+}
+
+test_rerun_after_renaming_agents_creates_no_template_agents() {
+    # Arrange：裝 fullstack 後把五個 Agent 定義全部改名
+    run_install agent-team-fullstack "${TARGET}"
+    rename_all_agents
+    local before
+    before="$(agents_digest)"
+    # Act
+    run_install agent-team-fullstack "${TARGET}"
+    # Assert
+    assert_eq "${CODE}" 0 "結束碼"
+    assert_eq "$(agents_digest)" "${before}" "Agent 定義不增不變"
+    assert_no_file "${TARGET}/.claude/agents/hyuse.md" "不應重建範本 Agent"
+    assert_no_file "${TARGET}/.claude/agents/chika.md" "不應重建範本 Agent"
+    assert_contains "${OUT}" "略過（.claude/agents/ 已有 Agent 定義，不建立範本名稱的 Agent）：.claude/agents/hyuse.md" "回報略過原因"
+}
+
+test_single_side_rerun_after_renaming_agents_still_restores_other_files() {
+    # Arrange：裝 single-side 後改名全部 Agent，並刪掉 ship-issue.md
+    run_install agent-team-single-side "${TARGET}"
+    rename_all_agents
+    rm "${TARGET}/.claude/commands/ship-issue.md"
+    # Act
+    run_install agent-team-single-side "${TARGET}"
+    # Assert
+    assert_eq "${CODE}" 0 "結束碼"
+    assert_eq "$(ls "${TARGET}/.claude/agents" | wc -l | tr -d ' ')" 4 "Agent 定義數"
+    assert_no_file "${TARGET}/.claude/agents/osamu.md" "不應重建範本 Agent"
+    assert_file "${TARGET}/.claude/commands/ship-issue.md" "其他骨架檔照舊補建"
+}
+
+test_agents_dir_without_definitions_installs_all_templates() {
+    # Arrange：.claude/agents/ 存在但只有非 .md 檔
+    mkdir -p "${TARGET}/.claude/agents"
+    : >"${TARGET}/.claude/agents/.gitkeep"
+    # Act
+    run_install agent-team-fullstack "${TARGET}"
+    # Assert
+    assert_eq "${CODE}" 0 "結束碼"
+    assert_eq "$(ls "${TARGET}/.claude/agents" | wc -l | tr -d ' ')" 5 "Agent 定義數"
+    assert_file "${TARGET}/.claude/agents/hyuse.md" "範本 Agent"
+}
+
 test_all_does_not_install_any_kit_file() {
     # Arrange：空目標
     # Act
