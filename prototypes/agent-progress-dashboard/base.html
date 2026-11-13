@@ -1,0 +1,687 @@
+<!-- prototypes/agent-progress-dashboard/base.html -->
+<!-- Agent 基地原型：雷達式基地平面圖，每個任務由一個幾何頭像代表，沿走廊在工作站間移動；可重播示範任務 -->
+<title>Agent 基地</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+TC:wght@500;700&display=swap">
+<style>
+  /* 版面：一張雷達平面圖佔滿版面；控制、最新事件、任務資訊卡浮在圖上。寬螢幕橫式平面圖，窄螢幕直式平面圖 */
+  /* 刻意只做深色單一主題：灰階點陣螢幕，只有角色帶顏色 */
+  :root {
+    color-scheme: dark;
+    --screen: #1b1f27;
+    --floor: #262b35;
+    --room: #2f3541;
+    --wall: #4b5361;
+    --dot: #353c49;
+    --ink: #d9dde4;
+    --ink-dim: #8b93a3;
+    --label: #d6dae1;
+    --label-ink: #4a505b;
+    --warn: #f2b142;
+    --danger: #f2665e;
+    --c-architect: #b9a2ff;
+    --c-backend: #ffa24c;
+    --c-frontend: #ff7eb6;
+    --c-integrator: #3fd9b8;
+    --c-reviewer: #6fb7ff;
+    --c-orchestrator: #e3e7ee;
+    --c-user: #ffd451;
+    --c-lost: #8b93a3;
+    --font-display: "Chakra Petch", "Noto Sans TC", system-ui, sans-serif;
+    --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  }
+
+  body { background: var(--screen); color: var(--ink); font-family: var(--font-body); }
+  .page {
+    max-width: 1200px; margin: 0 auto;
+    padding-block: 16px 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;
+  }
+  .bar { display: flex; align-items: center; gap: 10px; }
+  h1 { margin: 0; font-family: var(--font-display); font-size: 20px; letter-spacing: 0.08em; font-weight: 700; }
+  .demo { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.14em; color: var(--warn); border: 1px solid var(--warn); padding: 0 6px; }
+
+  .radar { position: relative; min-width: 0; border: 1px solid var(--wall); background: var(--floor); }
+  .radar svg#map { display: block; width: 100%; height: auto; }
+
+  /* 浮在圖上的控制與最新事件 */
+  .hud { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 6px; }
+  .hud button {
+    width: 34px; height: 34px; display: grid; place-items: center; padding: 0; cursor: pointer;
+    background: var(--label); border: 0; color: var(--label-ink);
+  }
+  .hud button:hover { background: #fff; }
+  .hud button:focus-visible { outline: 2px solid var(--c-reviewer); outline-offset: 2px; }
+  .hud .step { font-family: var(--font-display); font-size: 13px; color: var(--ink); letter-spacing: 0.08em; min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+  .ticker {
+    position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px);
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink);
+    background: rgba(27, 31, 39, 0.8); padding: 4px 10px 4px 4px; border-left: 3px solid var(--c, var(--ink-dim));
+  }
+  .ticker:empty { display: none; }
+  .ticker time { font-family: var(--font-display); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .ticker b { font-family: var(--font-display); }
+
+  /* 任務資訊卡：點頭像才出現 */
+  .card {
+    position: absolute; right: 10px; bottom: 10px; width: 260px; max-width: calc(100% - 20px);
+    background: var(--label); color: var(--label-ink); display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 4px 10px;
+    padding: 10px; border-top: 4px solid var(--c);
+  }
+  .card[hidden] { display: none; }
+  .card svg { grid-row: span 4; width: 52px; height: 52px; background: var(--screen); }
+  .card .name { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: #23272f; letter-spacing: 0.06em; }
+  .card .name span { font-family: var(--font-body); font-weight: 500; font-size: 12px; color: var(--label-ink); margin-left: 6px; letter-spacing: 0; }
+  .card .row { font-size: 13px; overflow-wrap: anywhere; display: flex; align-items: center; gap: 6px; }
+  .card .row svg { all: unset; width: 14px; height: 14px; flex: none; }
+  .card .meter { height: 5px; background: #b8bec8; }
+  .card .meter span { display: block; height: 100%; background: #23272f; }
+  .card .alert { color: #b3261e; font-weight: 700; }
+  .card .close {
+    position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: 0; background: none; cursor: pointer; color: var(--label-ink); font-size: 16px; line-height: 1;
+  }
+  @media (max-width: 640px) {
+    .hud { position: static; justify-content: flex-end; padding: 8px 8px 0; }
+    .card { position: static; width: auto; max-width: none; }
+    .ticker { position: static; max-width: none; margin-top: 0; }
+  }
+
+  /* SVG 內的樣式 */
+  .room-shape { fill: var(--room); stroke: var(--wall); stroke-width: 2; }
+  .room-detail { fill: none; stroke: var(--wall); stroke-width: 1.5; opacity: 0.7; }
+  .room-label { font-family: var(--font-body); font-weight: 700; font-size: 15px; fill: var(--ink-dim); letter-spacing: 0.1em; }
+  .room-icon { fill: none; stroke: var(--ink-dim); stroke-width: 1.6; }
+  .room.optional .room-shape, .room.bay .room-shape { stroke-dasharray: 7 6; }
+  .room.bay .room-shape { fill: rgba(139, 147, 163, 0.08); }
+  .corridor { fill: none; stroke: var(--floor); stroke-width: 34; stroke-linejoin: miter; }
+  .corridor-edge { fill: none; stroke: var(--wall); stroke-width: 38; stroke-linejoin: miter; }
+  .flowline { fill: none; stroke: var(--ink-dim); stroke-width: 1.5; stroke-dasharray: 2 10; opacity: 0.6; }
+  .hub-ring { fill: none; stroke: var(--wall); stroke-width: 1.5; }
+  .sweep { fill: url(#sweep-grad); }
+
+  .token, .token-tag { cursor: pointer; outline: none; }
+  .token .glow { fill: var(--c); filter: url(#soft); opacity: 0.5; }
+  .token .ring { fill: none; stroke: var(--c); stroke-width: 2.5; }
+  .token .face { fill: #e6e9ee; }
+  .token .helmet { fill: var(--c); }
+  .token .eye { fill: #2b3039; }
+  .token .collar { fill: var(--c); }
+  .token .select { fill: none; stroke: #fff; stroke-width: 2; stroke-dasharray: 4 4; opacity: 0; }
+  .token.selected .select, .token:focus-visible .select { opacity: 1; }
+  .tail circle { fill: var(--c); }
+  .tail, .token .glow, .trail { pointer-events: none; }
+  .leader { stroke: var(--label); stroke-width: 1.5; }
+  .leader-dot { fill: var(--label); }
+  .tag-icon { fill: var(--label-ink); }
+  .tag-icon.returned { fill: var(--danger); }
+  .tag-icon.paused { fill: var(--warn); }
+  .tag-icon-glyph { fill: none; stroke: var(--label); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tag-body { fill: var(--label); }
+  .tag-name { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 0.12em; fill: var(--label-ink); }
+  .tag-id { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: 0.06em; fill: #2b3039; }
+  .tag-rule { stroke: var(--label-ink); stroke-width: 1.2; }
+  .trail { fill: var(--c); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .token .glow { animation: pulse 2.8s ease-in-out infinite; }
+    .sweep { animation: spin 6s linear infinite; transform-box: view-box; }
+    .flowline { animation: flow 2s linear infinite; }
+    .trail { animation: fade 2.6s ease-out forwards; }
+  }
+  @media (prefers-reduced-motion: reduce) { .trail { opacity: 0; } }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes flow { to { stroke-dashoffset: -24; } }
+  @keyframes fade { from { opacity: 0.9; } to { opacity: 0; } }
+</style>
+
+<div class="page">
+  <div class="bar"><h1>AGENT 基地</h1><span class="demo">DEMO</span></div>
+
+  <div class="radar" id="radar">
+    <svg id="map" role="img" aria-label="Agent 基地平面圖"></svg>
+    <div class="hud">
+      <span class="step" id="step"></span>
+      <button type="button" id="btn-play" aria-label="播放"></button>
+      <button type="button" id="btn-next" aria-label="下一步"></button>
+      <button type="button" id="btn-reset" aria-label="重來"></button>
+    </div>
+    <div class="ticker" id="ticker" aria-live="polite"></div>
+    <div class="card" id="card" hidden></div>
+  </div>
+</div>
+
+<script type="module">
+  import { FIXTURES, REPLAY } from "./demo-data.js";
+  import { buildProgress, roleForStage } from "./handoff-status.js";
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- 角色（顯示名稱屬於頁面，kit 允許改名） ----
+  const ROLES = {
+    architect: { name: "HYUSE", title: "architect" },
+    backend: { name: "CHIKA", title: "後端" },
+    frontend: { name: "YUMA", title: "前端" },
+    integrator: { name: "OSAMU", title: "integrator" },
+    reviewer: { name: "SHIORI", title: "reviewer" },
+    orchestrator: { name: "主對話", title: "總指揮" },
+    user: { name: "你", title: "審批" },
+    lost: { name: "UNKNOWN", title: "訊號遺失" },
+  };
+
+  // 頭盔造型：每個角色不同的幾何輪廓（臉的中心在 0,0、半徑 16）
+  const HELMET = {
+    architect: '<path d="M-19 -3 L0 -30 L19 -3 Z"/>',
+    backend: '<rect x="-19" y="-21" width="38" height="15" rx="2"/><rect x="-19" y="-8" width="5" height="12"/><rect x="14" y="-8" width="5" height="12"/>',
+    frontend: '<path d="M-19 8 Q-21 -21 0 -21 Q21 -21 19 8 L13 8 L13 -6 L-13 -6 L-13 8 Z"/>',
+    integrator: '<path d="M-19 -4 L-10 -21 L10 -21 L19 -4 Z"/>',
+    reviewer: '<path d="M-18 -5 Q0 -27 18 -5 Z"/><circle cx="6" cy="2" r="6" fill="none" stroke="var(--c)" stroke-width="2.2"/>',
+    orchestrator: '<path d="M-18 -4 Q0 -24 18 -4 Z"/><rect x="-1.5" y="-31" width="3" height="12"/><circle cx="0" cy="-32" r="3.5"/>',
+    user: '<path d="M-15 -9 L-15 -24 L-7 -16 L0 -27 L7 -16 L15 -24 L15 -9 Z"/>',
+    lost: '<text x="0" y="7" text-anchor="middle" font-size="22" font-weight="700" fill="#2b3039" font-family="Chakra Petch, sans-serif">?</text>',
+  };
+
+  // 功能圖示（16×16，畫在 -8..8）
+  const GLYPH = {
+    grid: "M-6 -6h12v12h-12z M-2 -6v12 M2 -6v12 M-6 -2h12 M-6 2h12",
+    block: "M0 -7 L7 -3 L7 3 L0 7 L-7 3 L-7 -3 Z M-7 -3 L0 1 L7 -3 M0 1 V7",
+    screen: "M-7 -6h14v9h-14z M-3 6h6 M0 3v3",
+    check: "M0 -7 L6 -4 L6 4 L0 7 L-6 4 L-6 -4 Z M-3 0 l2 2 l4 -4",
+    lens: "M-1 -1 m-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0 M3 3 L7 7",
+    shield: "M0 -7 L6 -5 V0 Q6 5 0 7 Q-6 5 -6 0 V-5 Z M-3 0 l2 2 l4 -4",
+    lock: "M-6 -1h12v8h-12z M-4 -1V-4a4 4 0 0 1 8 0v3",
+    merge: "M-5 -7v3 Q-5 1 0 2 V7 M5 -7v3 Q5 1 0 2",
+    question: "M-3 -3 Q-3 -6 0 -6 Q3 -6 3 -3 Q3 -1 0 0 V2 M0 5v0.5",
+    back: "M5 5 V-1 Q5 -5 1 -5 H-5 M-2 -8 L-5 -5 L-2 -2",
+    pause: "M-3 -6 V6 M3 -6 V6",
+  };
+
+  // ---- 工作站：流程順序即走廊順序；wide／tall 兩套平面座標 ----
+  const STATIONS = [
+    { id: "proposal", label: "提案", glyph: "grid", role: "architect" },
+    { id: "develop:backend", label: "後端", glyph: "block", role: "backend" },
+    { id: "develop:frontend", label: "前端", glyph: "screen", role: "frontend" },
+    { id: "integrating", label: "檢查", glyph: "check", role: "integrator" },
+    { id: "reviewing", label: "審查", glyph: "lens", role: "reviewer" },
+    { id: "pr-checking", label: "PR", glyph: "shield", role: "orchestrator" },
+    { id: "awaiting-approval", label: "審批", glyph: "lock", role: "user", optional: true },
+    { id: "merge-queue", label: "合併", glyph: "merge", role: "integrator" },
+  ];
+  const BAY = { id: "unknown", label: "待查", glyph: "question", bay: true };
+
+  const LAYOUTS = {
+    wide: {
+      w: 1000, h: 640, room: [200, 200], bay: [150, 96],
+      pos: {
+        proposal: [140, 150], "develop:backend": [380, 150], "develop:frontend": [620, 150], integrating: [860, 150],
+        reviewing: [860, 490], "pr-checking": [620, 490], "awaiting-approval": [380, 490], "merge-queue": [140, 490],
+        unknown: [140, 320],
+      },
+      hub: [500, 320],
+    },
+    tall: {
+      w: 600, h: 1130, room: [250, 200], bay: [170, 96],
+      pos: {
+        proposal: [150, 120], "develop:backend": [450, 120], "develop:frontend": [450, 400], integrating: [150, 400],
+        reviewing: [150, 730], "pr-checking": [450, 730], "awaiting-approval": [450, 1010], "merge-queue": [150, 1010],
+        unknown: [450, 565],
+      },
+      hub: [300, 565],
+    },
+  };
+  let L = LAYOUTS.wide;
+
+  const stationIndex = Object.fromEntries(STATIONS.map((s, i) => [s.id, i]));
+  const stationOf = (p) => (p.stage.key === "unknown" ? "unknown" : p.stage.key === "develop" ? `develop:${p.stage.side}` : p.stage.key);
+  const roleOf = (p) => roleForStage(p.stage) ?? "lost";
+  const shortId = (changeId) => (changeId.match(/^[a-z]+-(\d+)/i)?.[1] ?? changeId);
+  const escapeHtml = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const colorVar = (role) => `var(--c-${role})`;
+
+  /** 角色在走廊上的路線：往後走沿流程走廊，往回（退回）或進出待查區則經過中央 */
+  function route(from, to) {
+    const P = L.pos;
+    if (from === to) return [P[to]];
+    const a = stationIndex[from];
+    const b = stationIndex[to];
+    if (a !== undefined && b !== undefined && b > a) {
+      return STATIONS.slice(a, b + 1).map((s) => P[s.id]);
+    }
+    const [hx, hy] = L.hub;
+    const [fx, fy] = P[from];
+    const [tx, ty] = P[to];
+    return [[fx, fy], [fx, hy], [hx, hy], [tx, hy], [tx, ty]];
+  }
+
+  // ---- 任務 ----
+  const tasks = new Map();
+  let replayIndex = 0;
+  let selectedId = null;
+  const replayInput = (i) => {
+    const { steps, ...meta } = REPLAY;
+    return { ...meta, ...steps[i] };
+  };
+  const load = (input) => tasks.set(input.changeId, { input, progress: buildProgress(input), x: null, y: null, moving: false });
+  load(replayInput(0));
+  FIXTURES.forEach(load);
+
+  // ---- 繪製平面圖 ----
+  const svg = document.getElementById("map");
+  const el = (tag, attrs = {}, html = "") => {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (html) node.innerHTML = html;
+    return node;
+  };
+
+  function roomDetails(cx, cy, w, h, seed) {
+    // 房間內的幾何裝飾：沿牆的機櫃與管線，依 seed 固定，不隨重繪變動
+    const x0 = cx - w / 2;
+    const y0 = cy - h / 2;
+    const parts = [];
+    for (let i = 0; i < 3; i++) {
+      const bw = 18 + ((seed * (i + 3)) % 28);
+      parts.push(`<rect x="${x0 + w - 14 - bw - i * 4}" y="${y0 + 12 + i * 12}" width="${bw}" height="6"/>`);
+    }
+    parts.push(`<rect x="${x0 + w - 32}" y="${y0 + h - 34}" width="20" height="20"/>`);
+    return parts.join("");
+  }
+
+  function drawPlan() {
+    svg.setAttribute("viewBox", `0 0 ${L.w} ${L.h}`);
+    const P = L.pos;
+    const flowPoints = STATIONS.map((s) => P[s.id]);
+    const flowD = flowPoints.map((p, i) => `${i ? "L" : "M"}${p[0]} ${p[1]}`).join(" ");
+    const [hx, hy] = L.hub;
+    const [bx, by] = P.unknown;
+    const spineD = `M${P.reviewing[0]} ${hy} L${P["develop:backend"][0]} ${hy} M${bx} ${by} L${hx} ${hy} M${P.reviewing[0]} ${P.reviewing[1]} L${P.reviewing[0]} ${hy} M${P["develop:backend"][0]} ${P["develop:backend"][1]} L${P["develop:backend"][0]} ${hy}`;
+
+    const rooms = [...STATIONS, BAY]
+      .map((s, i) => {
+        const [cx, cy] = P[s.id];
+        const [w, h] = s.bay ? L.bay : L.room;
+        const cut = 16;
+        const x0 = cx - w / 2;
+        const y0 = cy - h / 2;
+        const shape = `M${x0 + cut} ${y0} H${x0 + w} V${y0 + h - cut} L${x0 + w - cut} ${y0 + h} H${x0} V${y0 + cut} Z`;
+        const cls = ["room", s.optional ? "optional" : "", s.bay ? "bay" : ""].join(" ").trim();
+        return `<g class="${cls}">
+            <path class="room-shape" d="${shape}"/>
+            <g class="room-detail">${roomDetails(cx, cy, w, h, i * 7 + 5)}</g>
+            <g transform="translate(${x0 + 22} ${y0 + 20})"><path class="room-icon" d="${GLYPH[s.glyph]}"/></g>
+            <text class="room-label" x="${x0 + 36}" y="${y0 + 25}">${s.label}</text>
+          </g>`;
+      })
+      .join("");
+
+    svg.innerHTML = `
+      <defs>
+        <pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1.1" fill="var(--dot)"/></pattern>
+        <filter id="soft" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="7"/></filter>
+        <linearGradient id="sweep-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8b93a3" stop-opacity="0"/><stop offset="1" stop-color="#8b93a3" stop-opacity="0.22"/>
+        </linearGradient>
+      </defs>
+      <rect width="${L.w}" height="${L.h}" fill="var(--floor)"/>
+      <rect width="${L.w}" height="${L.h}" fill="url(#dots)"/>
+      <path class="corridor-edge" d="${flowD} ${spineD}"/>
+      <path class="corridor" d="${flowD} ${spineD}"/>
+      <path class="flowline" d="${flowD}"/>
+      <g transform="translate(${hx} ${hy})">
+        <circle class="hub-ring" r="56"/><circle class="hub-ring" r="34"/><circle class="hub-ring" r="12"/>
+        <path class="sweep" d="M0 0 L56 0 A56 56 0 0 0 39.6 -39.6 Z" style="transform-origin:${hx}px ${hy}px"/>
+      </g>
+      ${rooms}
+      <g id="trails"></g>
+      <g id="tokens"></g>
+      <g id="tags"></g>`;
+  }
+
+  // ---- 角色頭像與標籤 ----
+  function head(role) {
+    return `<circle class="glow" r="30"/>
+      <circle class="select" r="33"/>
+      <path class="collar" d="M-6 16 L6 16 L0 27 Z"/>
+      <circle class="ring" r="21"/>
+      <circle class="face" r="16"/>
+      ${role === "lost" ? "" : '<rect class="eye" x="-7" y="1" width="4" height="4"/><rect class="eye" x="3" y="1" width="4" height="4"/>'}
+      <g class="helmet">${HELMET[role]}</g>`;
+  }
+
+  function statusOf(progress) {
+    if (progress.stage.key === "unknown") return { cls: "", glyph: "question" };
+    if (progress.pause?.returned) return { cls: "returned", glyph: "back" };
+    if (progress.pause) return { cls: "paused", glyph: progress.stage.key === "awaiting-approval" ? "lock" : "pause" };
+    const station = STATIONS.find((s) => s.id === stationOf(progress));
+    return { cls: "", glyph: station.glyph };
+  }
+
+  function tag(progress, role, offset) {
+    const { cls, glyph } = statusOf(progress);
+    const [dx, dy] = offset;
+    const id = progress.stage.key === "unknown" ? "UNKNOWN" : `#${shortId(progress.changeId)}`;
+    const name = progress.stage.key === "unknown" ? "?" : ROLES[role].name;
+    const count = progress.pause?.returned ? `<tspan dx="5" style="fill:var(--danger)">×${progress.pause.returnCount}</tspan>` : "";
+    const textWidth = (str, size) => [...str].reduce((sum, ch) => sum + (ch.charCodeAt(0) > 0x2e80 ? size * 1.05 : /[A-Z#]/.test(ch) ? size * 0.78 : size * 0.68), 0);
+    const bodyW = Math.ceil(Math.max(textWidth(name, 11) + 11 * 0.12 * name.length + (count ? 24 : 0), textWidth(id, 17)) + 14);
+    const leaderY = dy + 34 < -22 ? dy + 34 : dy + 17;
+    const leaderX = dy + 34 < -22 ? dx + 17 : dx;
+    const leader = `<line class="leader" x1="0" y1="-22" x2="${leaderX}" y2="${leaderY}"/>
+      <circle class="leader-dot" cx="0" cy="-22" r="2.5"/>`;
+    const box = `<rect class="tag-icon ${cls}" x="${dx}" y="${dy}" width="34" height="34"/>
+      <g transform="translate(${dx + 17} ${dy + 17})"><path class="tag-icon-glyph" d="${GLYPH[glyph]}"/></g>
+      <rect class="tag-body" x="${dx + 34}" y="${dy}" width="${bodyW}" height="34"/>
+      <text class="tag-name" x="${dx + 41}" y="${dy + 13}">${escapeHtml(name)}${count}</text>
+      <text class="tag-id" x="${dx + 41}" y="${dy + 29}">${escapeHtml(id)}</text>`;
+    return { leader, box };
+  }
+
+  /** 上一站相對於本站的單位方向；第一站與待查區沒有 */
+  function incoming(stationId) {
+    const i = stationIndex[stationId];
+    if (!i) return null;
+    const [px, py] = L.pos[STATIONS[i - 1].id];
+    const [cx, cy] = L.pos[stationId];
+    const len = Math.hypot(px - cx, py - cy) || 1;
+    return [(px - cx) / len, (py - cy) / len];
+  }
+
+  /** 靜態尾巴：身後 4 個點，指向上一站的方向 */
+  function tail(stationId) {
+    const dir = incoming(stationId);
+    if (!dir) return "";
+    const [ux, uy] = dir;
+    return [0, 1, 2, 3].map((k) => `<circle cx="${(ux * (34 + k * 11)).toFixed(1)}" cy="${(uy * (34 + k * 11)).toFixed(1)}" r="${3 - k * 0.5}" opacity="${0.8 - k * 0.18}"/>`).join("");
+  }
+
+  const tokenEls = new Map();
+  const tagEls = new Map();
+
+  function renderToken(id) {
+    const t = tasks.get(id);
+    const role = roleOf(t.progress);
+    let g = tokenEls.get(id);
+    if (!g) {
+      g = el("g", { class: "token", tabindex: "0", role: "button", "data-id": id });
+      document.getElementById("tokens").append(g);
+      tokenEls.set(id, g);
+    }
+    g.style.setProperty("--c", colorVar(role));
+    g.setAttribute("aria-label", `${t.progress.changeId}，${ROLES[role].name}，${t.progress.stage.label}`);
+    g.classList.toggle("selected", id === selectedId);
+    t.role = role;
+  }
+
+  function paintToken(id, offset, showTail = true) {
+    const t = tasks.get(id);
+    const g = tokenEls.get(id);
+    const { leader, box } = tag(t.progress, t.role, offset);
+    const transform = `translate(${t.x.toFixed(1)} ${t.y.toFixed(1)})`;
+    g.innerHTML = `<g class="tail">${t.moving || !showTail ? "" : tail(stationOf(t.progress))}</g>${leader}${head(t.role)}`;
+    g.setAttribute("transform", transform);
+    let tg = tagEls.get(id);
+    if (!tg) {
+      tg = el("g", { class: "token-tag", "aria-hidden": "true", "data-id": id });
+      document.getElementById("tags").append(tg);
+      tagEls.set(id, tg);
+    }
+    tg.innerHTML = box;
+    tg.setAttribute("transform", transform);
+  }
+
+  // 同一站多個角色：橫向排開，標籤高低交錯避免重疊
+  function slots() {
+    const groups = new Map();
+    for (const [id, t] of tasks) {
+      const s = stationOf(t.progress);
+      if (!groups.has(s)) groups.set(s, []);
+      groups.get(s).push(id);
+    }
+    const result = new Map();
+    for (const [s, ids] of groups) {
+      const [cx, cy] = L.pos[s];
+      const [w, h] = s === "unknown" ? L.bay : L.room;
+      const gap = Math.min(66, (w - 60) / Math.max(ids.length - 1, 1));
+      const y0 = cy - h / 2;
+      ids.forEach((id, i) => {
+        const x = cx + (i - (ids.length - 1) / 2) * gap;
+        if (s === "unknown") {
+          // 待查區太矮：頭像在左、標籤放右側
+          result.set(id, { x: cx - w / 2 + 40, y: cy + 6, offset: [26, -40] });
+          return;
+        }
+        const y = y0 + h - 40;
+        const tagTop = y0 + 38 + (i % 2) * 40;
+        // 尾巴朝來處：橫向來的只畫在該側最外面那個，避免點蓋到隔壁頭像
+        const dir = incoming(s);
+        const showTail = !dir || Math.abs(dir[0]) < Math.abs(dir[1]) || (dir[0] < 0 ? i === 0 : i === ids.length - 1);
+        result.set(id, { x, y, offset: [-18, tagTop - y], tail: showTail });
+      });
+    }
+    return result;
+  }
+
+  let currentSlots = new Map();
+
+  function placeAll() {
+    currentSlots = slots();
+    for (const [id, t] of tasks) {
+      if (t.moving) continue;
+      const s = currentSlots.get(id);
+      t.x = s.x;
+      t.y = s.y;
+      paintToken(id, s.offset, s.tail);
+    }
+  }
+
+  // ---- 移動：沿路線前進，留下會淡出的點狀軌跡 ----
+  function walk(id, points, done) {
+    const t = tasks.get(id);
+    const trails = document.getElementById("trails");
+    const pts = [[t.x, t.y], ...points];
+    const segs = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const len = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      segs.push({ a: pts[i - 1], b: pts[i], len, at: total });
+      total += len;
+    }
+    if (reduceMotion || total < 1) {
+      [t.x, t.y] = pts[pts.length - 1];
+      return done();
+    }
+    t.moving = true;
+    const duration = Math.max(700, total / 0.32);
+    const start = performance.now();
+    let lastDrop = 0;
+    const offset = currentSlots.get(id)?.offset ?? [-18, -96];
+    function frame(now) {
+      const k = Math.min(1, (now - start) / duration);
+      const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const d = eased * total;
+      const seg = segs.find((s) => d <= s.at + s.len) ?? segs[segs.length - 1];
+      const f = seg.len ? (d - seg.at) / seg.len : 1;
+      t.x = seg.a[0] + (seg.b[0] - seg.a[0]) * f;
+      t.y = seg.a[1] + (seg.b[1] - seg.a[1]) * f;
+      if (d - lastDrop > 13) {
+        lastDrop = d;
+        const dot = el("circle", { class: "trail", cx: t.x.toFixed(1), cy: (t.y + 4).toFixed(1), r: "3" });
+        dot.style.setProperty("--c", colorVar(t.role));
+        trails.append(dot);
+        setTimeout(() => dot.remove(), 2700);
+      }
+      paintToken(id, offset);
+      if (k < 1) requestAnimationFrame(frame);
+      else {
+        t.moving = false;
+        done();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- 資訊卡 ----
+  const card = document.getElementById("card");
+  const ICON_SVG = (glyph) => `<svg viewBox="-8 -8 16 16"><path d="${GLYPH[glyph]}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  function renderCard() {
+    if (!selectedId) {
+      card.hidden = true;
+      return;
+    }
+    const { input, progress } = tasks.get(selectedId);
+    const role = roleOf(progress);
+    const t = progress.tasks;
+    const pct = t && t.total ? Math.round((t.done / t.total) * 100) : 0;
+    const s = progress.status;
+    card.style.setProperty("--c", colorVar(role));
+    card.innerHTML = `
+      <button type="button" class="close" id="card-close" aria-label="關閉">×</button>
+      <svg viewBox="-34 -36 68 68" style="--c:${colorVar(role)}" class="token">${head(role)}</svg>
+      <div class="name">${escapeHtml(ROLES[role].name)}<span>${escapeHtml(progress.stage.key === "unknown" ? `階段：${progress.stage.raw || "空白"}` : progress.stage.label)}</span></div>
+      <div class="row"><b>#${escapeHtml(shortId(progress.changeId))}</b>${escapeHtml(input.title)}</div>
+      ${progress.pause ? `<div class="row alert">${ICON_SVG(progress.pause.returned ? "back" : "pause")}${escapeHtml(progress.pause.reason)}</div>` : ""}
+      <div class="row">${escapeHtml(s?.lastDone || "—")} → ${escapeHtml(s?.next || "—")}</div>
+      ${t ? `<div class="row" style="grid-column:2">${t.done}/${t.total}</div><div class="meter" style="grid-column:1 / -1"><span style="width:${pct}%"></span></div>` : ""}`;
+    card.hidden = false;
+  }
+
+  function select(id) {
+    selectedId = selectedId === id ? null : id;
+    for (const [key, g] of tokenEls) g.classList.toggle("selected", key === selectedId);
+    renderCard();
+  }
+
+  svg.addEventListener("click", (e) => {
+    const g = e.target.closest(".token, .token-tag");
+    select(g ? g.dataset.id : null);
+  });
+  svg.addEventListener("keydown", (e) => {
+    const g = e.target.closest(".token");
+    if (g && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      select(g.dataset.id);
+    }
+  });
+  card.addEventListener("click", (e) => {
+    if (e.target.id === "card-close") select(selectedId);
+  });
+
+  // ---- 重播 ----
+  const stepEl = document.getElementById("step");
+  const ticker = document.getElementById("ticker");
+  const playBtn = document.getElementById("btn-play");
+  const BTN = {
+    play: '<svg width="14" height="14" viewBox="-8 -8 16 16"><path d="M-4 -6 L6 0 L-4 6 Z" fill="currentColor"/></svg>',
+    pause: `<svg width="14" height="14" viewBox="-8 -8 16 16"><path d="${GLYPH.pause}" stroke="currentColor" stroke-width="2.4" fill="none"/></svg>`,
+    next: '<svg width="14" height="14" viewBox="-8 -8 16 16"><path d="M-6 -6 L3 0 L-6 6 Z M5 -6 V6" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>',
+    reset: '<svg width="14" height="14" viewBox="-8 -8 16 16"><path d="M5 -3 A6 6 0 1 0 6 2 M6 -7 V-2 H1" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  };
+  playBtn.innerHTML = BTN.play;
+  document.getElementById("btn-next").innerHTML = BTN.next;
+  document.getElementById("btn-reset").innerHTML = BTN.reset;
+
+  let timer = null;
+  let busy = false;
+
+  function tick(prev, next) {
+    const role = roleOf(next);
+    const station = STATIONS.find((s) => s.id === stationOf(next));
+    const glyph = next.pause?.returned ? "back" : station.glyph;
+    ticker.style.setProperty("--c", colorVar(role));
+    ticker.innerHTML = `<time>${escapeHtml(next.status.updatedAt.slice(11))}</time>${ICON_SVG(glyph).replace("<svg", '<svg width="14" height="14"')}<b>${escapeHtml(ROLES[role].name)}</b>#${escapeHtml(shortId(next.changeId))} → ${escapeHtml(station.label)}${next.pause?.returned ? ` ×${next.pause.returnCount}` : ""}`;
+  }
+
+  function updateStep() {
+    stepEl.textContent = `${String(replayIndex + 1).padStart(2, "0")}/${REPLAY.steps.length}`;
+  }
+
+  function goTo(index, { animate = true } = {}) {
+    const id = REPLAY.changeId;
+    const before = tasks.get(id);
+    const prev = before.progress;
+    const { x, y } = before;
+    replayIndex = index;
+    load(replayInput(index));
+    const t = tasks.get(id);
+    t.x = x;
+    t.y = y;
+    renderToken(id);
+    const from = stationOf(prev);
+    const to = stationOf(t.progress);
+    tick(prev, t.progress);
+    updateStep();
+    if (selectedId === id) renderCard();
+    const target = slots().get(id);
+    if (!animate || from === to) {
+      placeAll();
+      return;
+    }
+    busy = true;
+    const path = route(from, to).slice(1, -1).concat([[target.x, target.y]]);
+    // 先離開房間走到走廊上的站點中心，再沿路線前進
+    walk(id, [L.pos[from], ...path], () => {
+      busy = false;
+      placeAll();
+    });
+    placeAll();
+  }
+
+  function stop() {
+    clearInterval(timer);
+    timer = null;
+    playBtn.innerHTML = BTN.play;
+    playBtn.setAttribute("aria-label", "播放");
+  }
+  function next() {
+    if (busy) return;
+    if (replayIndex >= REPLAY.steps.length - 1) return stop();
+    goTo(replayIndex + 1);
+    if (replayIndex >= REPLAY.steps.length - 1) stop();
+  }
+  function reset() {
+    stop();
+    goTo(0, { animate: false });
+  }
+  playBtn.addEventListener("click", () => {
+    if (timer) return stop();
+    if (replayIndex >= REPLAY.steps.length - 1) reset();
+    playBtn.innerHTML = BTN.pause;
+    playBtn.setAttribute("aria-label", "暫停");
+    next();
+    timer = setInterval(next, 2200);
+  });
+  document.getElementById("btn-next").addEventListener("click", () => {
+    stop();
+    next();
+  });
+  document.getElementById("btn-reset").addEventListener("click", reset);
+
+  // ---- 版面：依寬度選橫式或直式平面圖 ----
+  function build() {
+    L = document.getElementById("radar").clientWidth < 640 ? LAYOUTS.tall : LAYOUTS.wide;
+    drawPlan();
+    tokenEls.clear();
+    tagEls.clear();
+    for (const t of tasks.values()) t.moving = false;
+    for (const id of tasks.keys()) renderToken(id);
+    placeAll();
+  }
+
+  let currentLayout = null;
+  new ResizeObserver(() => {
+    const want = document.getElementById("radar").clientWidth < 640 ? "tall" : "wide";
+    if (want !== currentLayout) {
+      currentLayout = want;
+      build();
+    }
+  }).observe(document.getElementById("radar"));
+
+  updateStep();
+  tick(null, tasks.get(REPLAY.changeId).progress);
+</script>

@@ -1,0 +1,346 @@
+<!-- prototypes/agent-progress-dashboard/index.html -->
+<!-- Agent 任務進度看板原型：以示範用 handoff.md／tasks.md 文字經 handoff-status.js 解析後呈現 -->
+<title>Agent 任務看板</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* 版面：頁首 → 各階段件數總覽（點選可篩選）→ 每個 change 一張卡片（階段列、完成度、狀態欄位、原始 handoff.md） */
+  :root {
+    --bg: #f3f5f8;
+    --surface: #ffffff;
+    --line: #d9dee7;
+    --fg: #1c2330;
+    --muted: #5d6879;
+    --accent: #2f5fd0;
+    --accent-soft: #e3eafb;
+    --warn: #b36b00;
+    --warn-soft: #fdf0d9;
+    --danger: #c2372f;
+    --danger-soft: #fbe3e1;
+    --ok: #23824f;
+    --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --font-display: "Space Grotesk", "Noto Sans TC", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161d; --surface: #1a2029; --line: #2c3442; --fg: #e4e8ef; --muted: #98a3b4;
+      --accent: #7f9ff0; --accent-soft: #233150; --warn: #f0b25a; --warn-soft: #3a2c14;
+      --danger: #f08a82; --danger-soft: #42201e; --ok: #6cc996; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161d; --surface: #1a2029; --line: #2c3442; --fg: #e4e8ef; --muted: #98a3b4;
+    --accent: #7f9ff0; --accent-soft: #233150; --warn: #f0b25a; --warn-soft: #3a2c14;
+    --danger: #f08a82; --danger-soft: #42201e; --ok: #6cc996; color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-block: 28px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  header { display: grid; gap: 8px; min-width: 0; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  h1 {
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 4vw, 32px);
+    line-height: 1.2; margin: 0; text-wrap: balance;
+  }
+  .lede { margin: 0; color: var(--muted); max-width: 65ch; }
+  .demo-chip {
+    justify-self: start; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; padding: 2px 10px; border-radius: 999px;
+    border: 1px dashed var(--warn); color: var(--warn); background: var(--warn-soft);
+  }
+
+  /* 各階段件數總覽 */
+  .summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px;
+  }
+  .summary button {
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; display: grid; gap: 2px;
+  }
+  .summary button:hover { border-color: var(--accent); }
+  .summary button:focus-visible, .card summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .summary button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .summary .count { font-family: var(--font-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .summary .name { font-weight: 500; font-size: 14px; }
+  .summary .role { font-size: 12px; color: var(--muted); }
+  .summary .alert { font-size: 12px; color: var(--danger); min-height: 1.2em; }
+  .summary button[data-key="unknown"] .count { color: var(--muted); }
+
+  .filter-note { margin: 0; font-size: 13px; color: var(--muted); }
+  .filter-note button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+
+  /* 卡片 */
+  .cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0;
+  }
+  .card.is-returned { border-left: 4px solid var(--danger); }
+  .card.is-paused { border-left: 4px solid var(--warn); }
+  .card.is-unknown { border-left: 4px dashed var(--muted); }
+  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+  .change-id { font-family: var(--font-mono); font-weight: 500; font-size: 15px; word-break: break-all; }
+  .card-title { color: var(--muted); font-size: 14px; flex: 1 1 200px; min-width: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); white-space: nowrap;
+  }
+  .chip.returned { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); font-weight: 500; }
+  .chip.paused { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); font-weight: 500; }
+  .chip.unknown { border-style: dashed; }
+
+  .reason { margin: 0; font-size: 14px; padding: 6px 10px; border-radius: 6px; background: var(--warn-soft); color: var(--fg); }
+  .card.is-returned .reason { background: var(--danger-soft); }
+  .reason strong { font-weight: 500; }
+  .unknown-note { margin: 0; font-size: 14px; color: var(--muted); }
+  .unknown-note code { font-family: var(--font-mono); }
+
+  /* 階段列：窄螢幕時在自己的容器內橫向捲動 */
+  .lane-wrap { overflow-x: auto; min-width: 0; }
+  .lane { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; min-width: 640px; }
+  .lane li {
+    flex: 1 1 0; position: relative; font-size: 13px; text-align: center;
+    padding: 8px 4px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .lane li::before {
+    content: ""; display: block; height: 4px; border-radius: 2px; margin: -4px 0 6px;
+    background: var(--line);
+  }
+  .lane li.done { color: var(--fg); }
+  .lane li.done::before { background: var(--accent); opacity: 0.45; }
+  .lane li.current { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); font-weight: 700; }
+  .lane li.current::before { background: var(--accent); }
+  .card.is-paused .lane li.current, .card.is-returned .lane li.current { border-color: var(--warn); background: var(--warn-soft); }
+  .card.is-returned .lane li.current { border-color: var(--danger); background: var(--danger-soft); }
+  .card.is-paused .lane li.current::before { background: var(--warn); }
+  .card.is-returned .lane li.current::before { background: var(--danger); }
+  .lane li.optional.todo, .lane li.optional.done { border-style: dashed; }
+  .lane .here { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+
+  /* 完成度與狀態欄位 */
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px; }
+  .fact { display: grid; gap: 4px; min-width: 0; }
+  .fact dt { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+  .fact dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--ok); }
+  .split { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .card details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .card details summary:hover { color: var(--accent); }
+  .raw { display: grid; gap: 8px; margin-top: 8px; }
+  .raw pre {
+    margin: 0; padding: 10px 12px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line);
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre;
+  }
+  .raw h4 { margin: 0; font-size: 12px; font-weight: 500; color: var(--muted); font-family: var(--font-mono); }
+
+  /* 說明 */
+  .notes {
+    display: grid; gap: 8px; font-size: 14px; color: var(--muted);
+    border-top: 1px solid var(--line); padding-top: 16px;
+  }
+  .notes h2 { font-family: var(--font-display); font-size: 16px; margin: 0; color: var(--fg); }
+  .notes ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch; }
+  .notes code { font-family: var(--font-mono); font-size: 13px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .summary button, .lane li { transition: border-color 0.15s, background-color 0.15s; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">ship-issue · agent-team</span>
+    <h1>Agent 任務看板</h1>
+    <p class="lede">每張卡片是一個 <code>/ship-issue</code> 任務，位置來自 change 目錄裡 handoff.md 的「## 狀態」區塊，完成度來自 tasks.md 的勾選。</p>
+    <span class="demo-chip">示範資料：以下任務皆為虛構，用來展示各種狀態</span>
+  </header>
+
+  <nav class="summary" id="summary" aria-label="各階段件數"></nav>
+  <p class="filter-note" id="filter-note" hidden></p>
+
+  <main class="cards" id="cards"></main>
+
+  <section class="notes">
+    <h2>資料來源與目前的限制</h2>
+    <ul>
+      <li>只讀 <code>wt/&lt;change-id&gt;/openspec/changes/&lt;change-id&gt;/handoff.md</code> 的狀態區塊與同目錄的 <code>tasks.md</code>；歸檔後改讀 <code>openspec/changes/archive/&lt;日期&gt;-&lt;change-id&gt;/</code>。</li>
+      <li>「PR 中檢查」無法再分成 CI、<code>/code-review</code>、<code>/security-review</code>，細節請看「最後完成」與「下一步」。</li>
+      <li>歸檔（<code>archived</code>）後一律顯示「合併隊列」，分不出合併中、已合併或合併失敗；合併失敗時流程不改階段，卡片會停在這裡。</li>
+      <li>「等待審批」只有高風險任務會經過，虛線格代表這一步可能被略過。</li>
+      <li>階段值不在對照表中，或找不到狀態區塊時，顯示「無法辨識」並附上原始值，不猜測位置。</li>
+    </ul>
+  </section>
+</div>
+
+<script type="module">
+  import { FIXTURES } from "./demo-data.js";
+  import { buildProgress } from "./handoff-status.js";
+
+  // ---- 總覽欄位：同一畫面階段合併計數（開發不分前後端） ----
+  const SUMMARY = [
+    { key: "proposal", name: "提案", role: "architect" },
+    { key: "develop", name: "開發", role: "後端／前端 Agent" },
+    { key: "integrating", name: "檢查", role: "integrator" },
+    { key: "reviewing", name: "PR 前審查", role: "reviewer" },
+    { key: "pr-checking", name: "PR 中檢查", role: "主對話" },
+    { key: "awaiting-approval", name: "等待審批", role: "你" },
+    { key: "merge-queue", name: "合併隊列", role: "integrator" },
+    { key: "unknown", name: "無法辨識", role: "需要檢查 handoff.md" },
+  ];
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+
+  const SIDE_LABEL = { backend: "後端", frontend: "前端" };
+
+  // 需要注意的排前面：無法辨識 → 退回 → 暫停 → 其餘依原順序
+  const priority = (p) => (p.stage.key === "unknown" ? 0 : p.pause?.returned ? 1 : p.pause ? 2 : 3);
+  const items = FIXTURES.map((fixture, order) => ({ fixture, order, progress: buildProgress(fixture) })).sort(
+    (a, b) => priority(a.progress) - priority(b.progress) || a.order - b.order,
+  );
+
+  let activeFilter = null;
+
+  function renderSummary() {
+    const root = document.getElementById("summary");
+    root.innerHTML = SUMMARY.map((col) => {
+      const inStage = items.filter((item) => item.progress.stage.key === col.key);
+      const stuck = inStage.filter((item) => item.progress.pause).length;
+      return `<button type="button" id="summary-${col.key}" data-key="${col.key}" aria-pressed="${activeFilter === col.key}">
+          <span class="count">${inStage.length}</span>
+          <span class="name">${col.name}</span>
+          <span class="role">${escapeHtml(col.role)}</span>
+          <span class="alert">${stuck ? `${stuck} 件暫停中` : ""}</span>
+        </button>`;
+    }).join("");
+  }
+
+  function renderLane(progress) {
+    const cells = progress.lane
+      .map((cell) => {
+        const classes = [cell.state, cell.optional ? "optional" : ""].join(" ").trim();
+        const here = cell.state === "current" ? `<span class="here">${progress.pause ? "暫停中" : "進行中"}</span>` : "";
+        const current = cell.state === "current" ? ' aria-current="step"' : "";
+        return `<li class="${classes}"${current}>${escapeHtml(cell.label)}${here}</li>`;
+      })
+      .join("");
+    return `<div class="lane-wrap"><ol class="lane" aria-label="工作流階段">${cells}</ol></div>`;
+  }
+
+  function renderTasks(progress) {
+    const t = progress.tasks;
+    if (!t) return `<dd>無任務清單</dd>`;
+    const pct = t.total ? Math.round((t.done / t.total) * 100) : 0;
+    const split =
+      progress.structure === "fullstack"
+        ? `<div class="split">後端 ${t.backend.done}／${t.backend.total} · 前端 ${t.frontend.done}／${t.frontend.total}</div>`
+        : "";
+    return `<dd><span class="num">${t.done}／${t.total}</span>（${pct}%）
+        <div class="bar" role="img" aria-label="完成 ${pct}%"><span style="width:${pct}%"></span></div>${split}</dd>`;
+  }
+
+  function renderCard({ fixture, progress }) {
+    const { status, stage, pause } = progress;
+    const stateClass = stage.key === "unknown" ? "is-unknown" : pause?.returned ? "is-returned" : pause ? "is-paused" : "";
+    const structureChip =
+      progress.structure === "single-side"
+        ? `single-side · ${SIDE_LABEL[progress.side] ?? "未宣告"}`
+        : "fullstack";
+    const stageChip =
+      stage.key === "unknown"
+        ? `<span class="chip unknown">無法辨識</span>`
+        : `<span class="chip">${escapeHtml(stage.label)}${stage.side && progress.structure === "fullstack" ? `・${SIDE_LABEL[stage.side]}` : ""}</span>`;
+    const pauseChip = pause
+      ? pause.returned
+        ? `<span class="chip returned">退回 ×${pause.returnCount}</span>`
+        : `<span class="chip paused">暫停</span>`
+      : "";
+    const reason = pause ? `<p class="reason"><strong>暫停原因：</strong>${escapeHtml(pause.reason)}</p>` : "";
+    const unknownNote =
+      stage.key === "unknown"
+        ? `<p class="unknown-note">階段原始值：<code>${escapeHtml(stage.raw) || "（找不到狀態區塊）"}</code>，不在對照表中，未標示位置。</p>`
+        : "";
+
+    return `<article class="card ${stateClass}" data-stage="${stage.key}">
+      <div class="card-head">
+        <span class="change-id">${escapeHtml(progress.changeId)}</span>
+        <span class="card-title">${escapeHtml(fixture.title)}</span>
+        <span class="chips">${stageChip}${pauseChip}<span class="chip">${structureChip}</span></span>
+      </div>
+      ${reason}${unknownNote}
+      ${renderLane(progress)}
+      <dl class="facts">
+        <div class="fact"><dt>任務完成度</dt>${renderTasks(progress)}</div>
+        <div class="fact"><dt>最後完成 → 下一步</dt><dd>${escapeHtml(status?.lastDone || "—")} → ${escapeHtml(status?.next || "—")}</dd></div>
+        <div class="fact"><dt>最後更新</dt><dd><span class="num">${escapeHtml(status?.updatedAt || "—")}</span> · ${escapeHtml(status?.updatedBy || "—")}</dd></div>
+      </dl>
+      <details>
+        <summary>查看原始 handoff.md／tasks.md</summary>
+        <div class="raw">
+          <h4>handoff.md</h4><pre>${escapeHtml(fixture.handoff)}</pre>
+          <h4>tasks.md</h4><pre>${escapeHtml(fixture.tasks ?? "（檔案不存在）")}</pre>
+        </div>
+      </details>
+    </article>`;
+  }
+
+  function renderCards() {
+    const visible = activeFilter ? items.filter((item) => item.progress.stage.key === activeFilter) : items;
+    document.getElementById("cards").innerHTML = visible.map(renderCard).join("");
+    const note = document.getElementById("filter-note");
+    if (activeFilter) {
+      const name = SUMMARY.find((col) => col.key === activeFilter).name;
+      note.innerHTML = `只顯示「${name}」的 ${visible.length} 件任務 · <button type="button" id="clear-filter">顯示全部</button>`;
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+  }
+
+  function render() {
+    renderSummary();
+    renderCards();
+  }
+
+  document.addEventListener("click", (event) => {
+    const col = event.target.closest(".summary button");
+    if (col) {
+      activeFilter = activeFilter === col.dataset.key ? null : col.dataset.key;
+      render();
+      return;
+    }
+    if (event.target.id === "clear-filter") {
+      activeFilter = null;
+      render();
+    }
+  });
+
+  render();
+</script>
