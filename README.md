@@ -155,3 +155,18 @@ source /path/to/littleduck-skills/completions/install.bash
 ```
 
 首次啟動步驟、手機端操作與限制見 [docs/remote-control.md](docs/remote-control.md)。
+
+## Agent 進度看板（原型）
+
+把 `/ship-issue` 各任務目前在工作流的哪個階段畫成看板，目前只有示範資料的原型，不會安裝到其他專案：
+
+- 資料來源：只讀 change 目錄 `handoff.md` 的「## 狀態」區塊與 `tasks.md` 的勾選；歸檔後改讀 `openspec/changes/archive/<日期>-<change-id>/`。
+- 階段對照：`proposal`→提案、`backend`／`frontend`→開發、`integrating`→檢查、`reviewing`→PR 前審查、`pr-checking`→PR 中檢查、`awaiting-approval`→等待審批、`archived`→合併隊列；其他值顯示「無法辨識」。暫停原因含「退回第 N 次」時標示退回次數。
+- 檔案：解析模組 `prototypes/agent-progress-dashboard/handoff-status.js`（無相依）、兩頁共用的示範資料 `demo-data.js`、卡片看板 `index.html`、RPG 基地 `base.html`。
+- RPG 基地：每個任務由一個幾何角色拿著，站在目前階段的工作站；角色外觀依負責的 Agent（提案 Hyuse、後端 Chika、前端 Yuma、檢查與合併隊列 Osamu、PR 前審查 Shiori、PR 中檢查主對話、等待審批是你）。「播放」會依序套用示範任務的 handoff.md 快照，看角色沿流程移動與退回。
+
+```bash
+node --test tests/prototypes/   # 解析模組的測試（需要 Node.js 18 以上）
+```
+
+本機預覽頁面時，伺服器要以 `charset=utf-8` 送出 HTML；`python3 -m http.server` 不帶 charset，中文會變亂碼。
